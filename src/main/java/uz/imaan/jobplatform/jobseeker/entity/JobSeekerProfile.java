@@ -1,0 +1,53 @@
+package uz.imaan.jobplatform.jobseeker.entity;
+
+import jakarta.persistence.*;
+import lombok.*;
+
+
+import java.math.BigDecimal;
+import java.util.ArrayList;
+import java.util.List;
+
+
+@Entity
+@Table(name = "job_seekers")
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
+
+public class JobSeekerProfile {
+
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @Column(name = "user_id", nullable = false, unique = true)
+    private Long userId;
+
+    @Column(name = "full_name")
+    private String fullName;
+
+    @Column(name = "phone_number")
+    private String phoneNumber;
+
+    private String profession;
+    private Double rating;
+    private String language;
+
+    @Column(name = "avatar_url")
+    private String avatarUrl;
+
+    @Column(length = 1000)
+    private String portfolio;
+
+    @Column(name = "wallet_balance", precision = 19, scale = 2)
+    private BigDecimal walletBalance;
+
+    @OneToMany(mappedBy = "jobSeeker", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
+    private List<BankCard> bankCards = new ArrayList<>();
+
+}
