@@ -6,7 +6,7 @@ import uz.imaan.jobplatform.admin.Admin;
 
 import java.util.Optional;
 
-public class AdminRepostory {
+
 
 
     @Repository
@@ -14,4 +14,4 @@ public class AdminRepostory {
         Optional<Admin> findByTelegramId(Long telegramId);
         boolean existsByTelegramId(Long telegramId);
     }
-}
+

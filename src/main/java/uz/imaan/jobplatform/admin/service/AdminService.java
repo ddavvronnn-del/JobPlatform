@@ -1,18 +1,20 @@
 package uz.imaan.jobplatform.admin.service;
 
+import org.springframework.stereotype.Service;
 import uz.imaan.jobplatform.admin.Admin;
 import uz.imaan.jobplatform.admin.dto.AdminDto;
 import uz.imaan.jobplatform.admin.mapper.AdminMapper;
-import uz.imaan.jobplatform.admin.repostory.AdminRepostory;
+import uz.imaan.jobplatform.admin.repostory.AdminRepository;
+
 
 import java.util.List;
 import java.util.stream.Collectors;
-
+@Service
 public class AdminService {
-    private final AdminRepostory.AdminRepository adminRepository;
+    private final AdminRepository adminRepository;
     private final AdminMapper adminMapper;
 
-    public AdminService(AdminRepostory.AdminRepository adminRepository, AdminMapper adminMapper) {
+    public AdminService(AdminRepository adminRepository, AdminMapper adminMapper) {
         this.adminRepository = adminRepository;
         this.adminMapper = adminMapper;
     }
