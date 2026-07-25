@@ -1,9 +1,9 @@
-package admin.mapper;
+package uz.imaan.jobplatform.admin.mapper;
 
 
 import org.springframework.stereotype.Component;
-import admin.Admin;
-import admin.dto.AdminDto;
+import uz.imaan.jobplatform.admin.Admin;
+import uz.imaan.jobplatform.admin.dto.AdminDto;
 
 @Component
 public class AdminMapper {

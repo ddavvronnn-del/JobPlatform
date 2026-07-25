@@ -1,9 +1,9 @@
-package admin.service;
+package uz.imaan.jobplatform.admin.service;
 
-import admin.Admin;
-import admin.dto.AdminDto;
-import admin.mapper.AdminMapper;
-import admin.repostory.AdminRepostory;
+import uz.imaan.jobplatform.admin.Admin;
+import uz.imaan.jobplatform.admin.dto.AdminDto;
+import uz.imaan.jobplatform.admin.mapper.AdminMapper;
+import uz.imaan.jobplatform.admin.repostory.AdminRepostory;
 
 import java.util.List;
 import java.util.stream.Collectors;

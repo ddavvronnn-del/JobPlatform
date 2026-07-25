@@ -1,8 +1,8 @@
-package admin.repostory;
+package uz.imaan.jobplatform.admin.repostory;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
-import admin.Admin;
+import uz.imaan.jobplatform.admin.Admin;
 
 import java.util.Optional;
 

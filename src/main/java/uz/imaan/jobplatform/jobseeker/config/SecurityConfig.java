@@ -1,4 +1,4 @@
-package uz.imaan.jobplatform.config;
+package uz.imaan.jobplatform.jobseeker.config;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;

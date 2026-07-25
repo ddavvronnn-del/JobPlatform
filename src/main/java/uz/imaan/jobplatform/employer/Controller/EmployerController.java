@@ -1,7 +1,7 @@
-package employer.Controller;
+package uz.imaan.jobplatform.employer.Controller;
 
-import employer.DTO.EmployerDTO;
-import employer.Service.EmployerService;
+import uz.imaan.jobplatform.employer.DTO.EmployerDTO;
+import uz.imaan.jobplatform.employer.Service.EmployerService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;

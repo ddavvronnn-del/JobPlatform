@@ -1,9 +1,9 @@
-package employer.Service;
+package uz.imaan.jobplatform.employer.Service;
 
-import employer.DTO.EmployerDTO;
-import employer.EmployerEntity;
-import employer.Mapper.EmployerMapper;
-import employer.Repository.EmployerRepository;
+import uz.imaan.jobplatform.employer.DTO.EmployerDTO;
+import uz.imaan.jobplatform.employer.EmployerEntity;
+import uz.imaan.jobplatform.employer.Mapper.EmployerMapper;
+import uz.imaan.jobplatform.employer.Repository.EmployerRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 

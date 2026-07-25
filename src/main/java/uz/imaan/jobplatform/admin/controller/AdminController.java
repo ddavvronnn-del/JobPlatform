@@ -1,7 +1,7 @@
-package admin.controller;
+package uz.imaan.jobplatform.admin.controller;
 
-import admin.dto.AdminDto;
-import admin.service.AdminService;
+import uz.imaan.jobplatform.admin.dto.AdminDto;
+import uz.imaan.jobplatform.admin.service.AdminService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;

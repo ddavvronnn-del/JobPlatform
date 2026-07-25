@@ -1,4 +1,4 @@
-package admin.dto;
+package uz.imaan.jobplatform.admin.dto;
 
 import lombok.Data;
 
