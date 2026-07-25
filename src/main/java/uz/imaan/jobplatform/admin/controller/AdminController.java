@@ -1,6 +1,6 @@
 package uz.imaan.jobplatform.admin.controller;
 
-import uz.imaan.jobplatform.admin.dto.AdminDto;
+import uz.imaan.jobplatform.admin.dto.AdminDTO;
 import uz.imaan.jobplatform.admin.service.AdminService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -15,17 +15,17 @@ public class AdminController {
         private final AdminService adminService;
 
         @GetMapping
-        public ResponseEntity<List<AdminDto.AdminDTO>> getAllAdmins() {
+        public ResponseEntity<List<AdminDTO>> getAllAdmins() {
             return ResponseEntity.ok(adminService.getAllAdmins());
         }
 
         @GetMapping("/{id}")
-        public ResponseEntity<AdminDto.AdminDTO> getAdminById(@PathVariable Long id) {
+        public ResponseEntity<AdminDTO> getAdminById(@PathVariable Long id) {
             return ResponseEntity.ok(adminService.getAdminById(id));
         }
 
         @PostMapping
-        public ResponseEntity<AdminDto.AdminDTO> createAdmin(@RequestBody AdminDto.AdminDTO adminDTO) {
+        public ResponseEntity<AdminDTO> createAdmin(@RequestBody AdminDTO adminDTO) {
             return ResponseEntity.ok(adminService.createAdmin(adminDTO));
         }
 

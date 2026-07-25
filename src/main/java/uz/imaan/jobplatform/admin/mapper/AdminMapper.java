@@ -3,15 +3,16 @@ package uz.imaan.jobplatform.admin.mapper;
 
 import org.springframework.stereotype.Component;
 import uz.imaan.jobplatform.admin.Admin;
-import uz.imaan.jobplatform.admin.dto.AdminDto;
+import uz.imaan.jobplatform.admin.dto.AdminDTO;
+
 
 @Component
 public class AdminMapper {
 
-    public AdminDto.AdminDTO toDTO(Admin entity) {
+    public AdminDTO toDTO(Admin entity) {
         if (entity == null) return null;
 
-        AdminDto.AdminDTO dto = new AdminDto.AdminDTO();
+        AdminDTO dto = new AdminDTO();
         dto.setId(entity.getId());
         dto.setTelegramId(entity.getTelegramId());
         dto.setUsername(entity.getUsername());
@@ -20,7 +21,7 @@ public class AdminMapper {
         return dto;
     }
 
-    public Admin toEntity(AdminDto.AdminDTO dto) {
+    public Admin toEntity(AdminDTO dto) {
         if (dto == null) return null;
 
         Admin entity = new Admin();
