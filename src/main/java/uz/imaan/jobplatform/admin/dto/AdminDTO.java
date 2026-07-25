@@ -1,6 +1,8 @@
 package uz.imaan.jobplatform.admin.dto;
 
 import lombok.Data;
+
+
     @Data
     public  class AdminDTO {
         private Long id;

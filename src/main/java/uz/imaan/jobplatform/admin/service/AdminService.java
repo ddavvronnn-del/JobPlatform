@@ -2,6 +2,7 @@ package uz.imaan.jobplatform.admin.service;
 
 import org.springframework.stereotype.Service;
 import uz.imaan.jobplatform.admin.Admin;
+
 import uz.imaan.jobplatform.admin.dto.AdminDTO;
 import uz.imaan.jobplatform.admin.mapper.AdminMapper;
 import uz.imaan.jobplatform.admin.repostory.AdminRepository;
