@@ -7,13 +7,13 @@ import lombok.NoArgsConstructor;
 
 
 @Data
-@NoArgsConstructor
 @AllArgsConstructor
+@NoArgsConstructor
 public class ApplyJobRequest {
 
-    @NotNull(message = "Job ID bo'sh bo'lishi mumkin emas")
-    private Long jobId;
+    @NotNull(message = "Job ID kiritilishi shart")
+    private Long  jobId;
+    private String comment;
 
-    private String coverLetter;
 
 }

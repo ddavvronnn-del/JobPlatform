@@ -1,5 +1,8 @@
 package uz.imaan.jobplatform.jobseeker.service;
 
+
+
+import lombok.extern.slf4j.Slf4j;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -15,6 +18,7 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class WalletService {
@@ -28,13 +32,20 @@ public class WalletService {
         JobSeekerProfile profile = profileRepository.findByUserId(userId)
                 .orElseThrow(() -> new RuntimeException("Ishchi profili topilmadi: " + userId));
 
+        // Karta raqamini tekshirish (oddiy validatsiya)
+        if (request.getCardNumber() == null || request.getCardNumber().length() < 16) {
+            throw new IllegalArgumentException("Noto'g'ri karta raqami!");
+        }
+
         BankCard bankCard = BankCard.builder()
                 .cardNumber(request.getCardNumber())
                 .expireDate(request.getExpireDate())
                 .jobSeeker(profile)
                 .build();
 
-        return bankCardRepository.save(bankCard);
+        BankCard savedCard = bankCardRepository.save(bankCard);
+        log.info("Yangi karta qo'shildi: userId={}, cardId={}", userId, savedCard.getId());
+        return savedCard;
     }
 
     @Transactional(readOnly = true)
@@ -53,16 +64,28 @@ public class WalletService {
 
     @Transactional
     public String withdrawMoney(Long userId, BigDecimal amount) {
+        if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new IllegalArgumentException("Miqdor 0 dan katta bo'lishi kerak!");
+        }
+
         JobSeekerProfile profile = profileRepository.findByUserId(userId)
                 .orElseThrow(() -> new RuntimeException("Ishchi profili topilmadi: " + userId));
 
-        if (profile.getWalletBalance() == null || profile.getWalletBalance().compareTo(amount) < 0) {
-            throw new RuntimeException("Hisobda yetarli mablag' mavjud emas");
+        // Kartalar mavjudligini tekshirish
+        List<BankCard> cards = bankCardRepository.findByJobSeekerId(profile.getId());
+        if (cards.isEmpty()) {
+            throw new IllegalStateException("Pul yechish uchun avval karta qo'shing!");
         }
 
+        if (profile.getWalletBalance() == null || profile.getWalletBalance().compareTo(amount) < 0) {
+            throw new RuntimeException("Hisobda yetarli mablag' mavjud emas! Balans: " + profile.getWalletBalance());
+        }
+
+        // Pulni yechish
         profile.setWalletBalance(profile.getWalletBalance().subtract(amount));
         profileRepository.save(profile);
 
+        // Tranzaksiyani saqlash
         WalletTransaction transaction = WalletTransaction.builder()
                 .jobSeekerId(profile.getId())
                 .amount(amount)
@@ -71,6 +94,8 @@ public class WalletService {
                 .build();
 
         transactionRepository.save(transaction);
-        return "Pul yechish so'rovi muvaffaqiyatli amalga oshirildi!";
+        log.info("Pul yechildi: userId={}, amount={}", userId, amount);
+
+        return "Pul yechish so'rovi muvaffaqiyatli amalga oshirildi! Yechilgan summa: " + amount;
     }
 }
