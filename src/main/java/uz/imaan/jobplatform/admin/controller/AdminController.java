@@ -1,5 +1,6 @@
 package uz.imaan.jobplatform.admin.controller;
 
+import io.swagger.v3.oas.annotations.Operation;
 import uz.imaan.jobplatform.admin.dto.AdminDTO;
 import uz.imaan.jobplatform.admin.service.AdminService;
 import lombok.RequiredArgsConstructor;
@@ -14,6 +15,11 @@ public class AdminController {
 
         private final AdminService adminService;
 
+
+    @GetMapping("/stats")
+    public ResponseEntity<AdminDTO> getStats() {
+        return ResponseEntity.ok(adminService.getStats());
+    }
         @GetMapping
         public ResponseEntity<List<AdminDTO>> getAllAdmins() {
             return ResponseEntity.ok(adminService.getAllAdmins());

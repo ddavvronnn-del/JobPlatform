@@ -6,9 +6,6 @@ import uz.imaan.jobplatform.admin.Admin;
 
 import java.util.Optional;
 
-
-
-
     @Repository
     public interface AdminRepository extends JpaRepository<Admin, Long> {
         Optional<Admin> findByTelegramId(Long telegramId);

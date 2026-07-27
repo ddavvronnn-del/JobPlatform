@@ -1,5 +1,6 @@
 package uz.imaan.jobplatform.admin.service;
 
+import io.swagger.v3.oas.annotations.media.Schema;
 import org.springframework.stereotype.Service;
 import uz.imaan.jobplatform.admin.Admin;
 
@@ -46,5 +47,19 @@ public class AdminService {
     public void deleteAdmin(Long id) {
         adminRepository.deleteById(id);
     }
+
+    public AdminDTO getStats() {
+        return AdminDTO.builder()
+                .totalAdmins(adminRepository.count())
+                // Заглушки или реальные вызовы из твоих репозиториев:
+                .totalEmployers(0L) // employerRepository.count()
+                .totalWorkers(0L)   // workerRepository.count()
+                .totalJobs(0L)      // jobRepository.count()
+                .activeJobs(0L)     // jobRepository.countByStatus("ACTIVE")
+                .completedJobs(0L)  // jobRepository.countByStatus("COMPLETED")
+                .build();
+    }
+
 }
+
 
