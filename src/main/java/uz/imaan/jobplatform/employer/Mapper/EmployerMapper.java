@@ -8,9 +8,14 @@ import org.springframework.stereotype.Component;
 public class EmployerMapper {
     public EmployerDTO toDTO(EmployerEntity entity) {
         if (entity == null) return null;
+
         return EmployerDTO.builder()
                 .id(entity.getId())
                 .employerChatId(entity.getEmployerChatId())
+                .inn(entity.getInn())
+                .passportSeriesNumber(entity.getPassportSeriesNumber())
+                .fullName(entity.getFullName())
+                .phoneNumber(entity.getPhoneNumber())
                 .category(entity.getCategory())
                 .jobType(entity.getJobType())
                 .salary(entity.getSalary())
@@ -27,9 +32,14 @@ public class EmployerMapper {
 
     public EmployerEntity toEntity(EmployerDTO dto) {
         if (dto == null) return null;
+
         return EmployerEntity.builder()
                 .id(dto.getId())
                 .employerChatId(dto.getEmployerChatId())
+                .inn(dto.getInn())
+                .passportSeriesNumber(dto.getPassportSeriesNumber())
+                .fullName(dto.getFullName())
+                .phoneNumber(dto.getPhoneNumber())
                 .category(dto.getCategory())
                 .jobType(dto.getJobType())
                 .salary(dto.getSalary())

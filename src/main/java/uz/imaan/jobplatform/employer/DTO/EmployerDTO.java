@@ -13,6 +13,10 @@ import java.time.LocalDate;
 @Builder
 public class EmployerDTO {
 
+    private String inn;
+    private String passportSeriesNumber;
+    private String fullName;
+    private String phoneNumber;
     private Long id;
     private Long employerChatId;
     private String category;

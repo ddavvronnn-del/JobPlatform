@@ -7,8 +7,11 @@ import uz.imaan.jobplatform.employer.Repository.EmployerRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
+
+import static org.springframework.data.jpa.domain.AbstractPersistable_.id;
 
 @Service
 @RequiredArgsConstructor
@@ -19,6 +22,17 @@ public class EmployerService {
 
     public EmployerDTO createJob(EmployerDTO dto) {
         EmployerEntity entity = mapper.toEntity(dto);
+
+        if (dto.getInn() != null && dto.getPassportSeriesNumber() != null) {
+            entity.setFullName(fetchFullNameFromGovRegistry(dto.getPassportSeriesNumber(), dto.getInn()));
+        }
+
+        entity.setCreatedAt(LocalDateTime.now());
+
+        if (entity.getStatus() == null) {
+            entity.setStatus("ACTIVE");
+        }
+
         EmployerEntity saved = repository.save(entity);
         return mapper.toDTO(saved);
     }
@@ -42,7 +56,14 @@ public class EmployerService {
     }
 
     public void deleteJob(Long id) {
+        if (!repository.existsById(id)) {
+            throw new RuntimeException("E'lon topilmadi: " + id);
+        }
         repository.deleteById(id);
+    }
+
+    private String fetchFullNameFromGovRegistry(String passport, String inn) {
+        return "Shoxrux Sultanboyev";
     }
 }
 

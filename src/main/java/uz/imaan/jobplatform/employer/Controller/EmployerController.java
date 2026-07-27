@@ -9,9 +9,10 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 @RestController
-@RequestMapping("/api/employer/jobs")
+@RequestMapping("/api/v1/employer")
 @RequiredArgsConstructor
-public class EmployerController {
+public class
+EmployerController {
 
     private final EmployerService service;
 

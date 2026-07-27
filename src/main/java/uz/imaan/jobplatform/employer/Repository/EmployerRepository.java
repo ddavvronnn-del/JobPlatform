@@ -12,4 +12,6 @@ public interface EmployerRepository extends JpaRepository<EmployerEntity, Long> 
     List<EmployerEntity> findByEmployerChatId(Long employerChatId);
 
     List<EmployerEntity> findByStatus(String status);
+
+    boolean existsByInn(String inn);
 }
