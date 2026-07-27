@@ -1,4 +1,4 @@
-package uz.imaan.jobplatform.employer.Repository;
+package uz.imaan.jobplatform.employer.repository;
 
 import uz.imaan.jobplatform.employer.EmployerEntity;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -12,4 +12,6 @@ public interface EmployerRepository extends JpaRepository<EmployerEntity, Long> 
     List<EmployerEntity> findByEmployerChatId(Long employerChatId);
 
     List<EmployerEntity> findByStatus(String status);
+
+    boolean existsByInn(String inn);
 }

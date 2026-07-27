@@ -4,6 +4,7 @@ import jakarta.persistence.*;
 import lombok.*;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "employer_jobs")
@@ -21,6 +22,12 @@ public class EmployerEntity {
     @Column(nullable = false)
     private Long employerChatId;
 
+    private String inn;
+    private String passportSeriesNumber;
+    private String fullName;
+    private String phoneNumber;
+
+    private LocalDateTime createdAt;
     private String category;
     private String jobType;
     private Double salary;

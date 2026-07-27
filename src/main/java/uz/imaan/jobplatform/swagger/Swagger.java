@@ -1,17 +1,17 @@
 package uz.imaan.jobplatform.swagger;
 
-import io.swagger.v3.oas.annotations.OpenAPIDefinition;
-import io.swagger.v3.oas.annotations.info.Info;
-import org.springframework.context.annotation.Configuration;
+import io.swagger.v3.oas.models.OpenAPI;
+import io.swagger.v3.oas.models.info.Info;
+import org.springframework.context.annotation.Bean;
 
-@Configuration
-@OpenAPIDefinition(
-        info = @Info(
-                title = "Admin Management API",
-                version = "1.0",
-                description = "Endpoints for managing admin users"
-        )
-)
+
 public class Swagger {
-
+    @Bean
+    public OpenAPI openAPI() {
+        return new OpenAPI()
+                .info(new Info()
+                        .title("Card API")
+                        .version("1.0")
+                        .description("Simple Card Management API"));
+    }
 }
