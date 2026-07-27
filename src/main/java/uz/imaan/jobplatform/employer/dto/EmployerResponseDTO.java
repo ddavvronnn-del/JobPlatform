@@ -1,4 +1,4 @@
-package uz.imaan.jobplatform.employer.DTO;
+package uz.imaan.jobplatform.employer.dto;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -6,19 +6,22 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 
 @Data
-@AllArgsConstructor
-@NoArgsConstructor
 @Builder
-public class EmployerDTO {
+@NoArgsConstructor
+@AllArgsConstructor
+public class EmployerResponseDTO {
+
+    private Long id;
+    private Long employerChatId;
 
     private String inn;
     private String passportSeriesNumber;
     private String fullName;
     private String phoneNumber;
-    private Long id;
-    private Long employerChatId;
+
     private String category;
     private String jobType;
     private Double salary;
@@ -27,7 +30,9 @@ public class EmployerDTO {
     private Integer workerCount;
     private String requirements;
     private Boolean foodProvided;
+
     private Double latitude;
     private Double longitude;
     private String status;
+    private LocalDateTime createdAt;
 }

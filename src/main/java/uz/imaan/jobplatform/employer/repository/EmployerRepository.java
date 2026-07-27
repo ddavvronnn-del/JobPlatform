@@ -1,4 +1,4 @@
-package uz.imaan.jobplatform.employer.Repository;
+package uz.imaan.jobplatform.employer.repository;
 
 import uz.imaan.jobplatform.employer.EmployerEntity;
 import org.springframework.data.jpa.repository.JpaRepository;
