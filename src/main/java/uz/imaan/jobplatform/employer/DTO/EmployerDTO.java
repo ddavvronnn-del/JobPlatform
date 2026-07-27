@@ -1,4 +1,4 @@
-package employer.DTO;
+package uz.imaan.jobplatform.employer.DTO;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;

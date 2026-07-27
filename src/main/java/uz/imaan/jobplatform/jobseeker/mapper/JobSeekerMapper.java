@@ -23,5 +23,4 @@ public class JobSeekerMapper {
                 .walletBalance(entity.getWalletBalance())
                 .build();
     }
-
 }

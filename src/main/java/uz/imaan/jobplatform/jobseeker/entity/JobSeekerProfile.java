@@ -19,7 +19,6 @@ import java.util.List;
 
 public class JobSeekerProfile {
 
-
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
