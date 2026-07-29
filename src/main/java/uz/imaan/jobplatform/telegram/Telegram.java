@@ -19,11 +19,10 @@ import java.util.List;
 @Component
 public class Telegram extends TelegramLongPollingBot {
 
-    private final String botUsername = "JobPlatformUzBot";
-    private final EmployerService employerService;
-    public Telegram(EmployerService employerService) {
+    private final String botUsername = "@JobPlatformUzBot";
+
+    public Telegram() {
         super("8449248126:AAHly6vbiHKNoCUhG_uc1EU2dfuO4DB6Ycg");
-        this.employerService = employerService;
     }
 
     @Override
@@ -55,7 +54,7 @@ public class Telegram extends TelegramLongPollingBot {
             // 4. EMPLOYER MENYU TUGMALARI ISHLASHI (Sizning serviceringiz chaqiriladi)
             else if (text.equals("Mening e'lonlarim")) {
                 // EmployerService dagi metodni chaqirib e'lonlarni olasiz
-
+                EmployerService employerService = null;
                 var jobs = employerService.getByEmployerChatId(chatId);
                 if (jobs.isEmpty()) {
                     sendMessage(chatId, "Sizda hali yaratilgan e'lonlar yo'q.");
@@ -72,6 +71,9 @@ public class Telegram extends TelegramLongPollingBot {
             else if (text.equals("Ishlarni ko'rish")) {
                 // jobSeekerService.getAllJobs()...
                 sendMessage(chatId, "Mavjud bo'sh ish o'rinlari ro'yxati...");
+            }
+            else if (text.equals("Mening arizalarim")) { // <-- SHU QISMINI QO'SHING
+                sendMessage(chatId, "Siz topshirgan arizalar ro'yxati (tez orada ulanadi)...");
             }
         }
     }
@@ -164,7 +166,6 @@ public class Telegram extends TelegramLongPollingBot {
             e.printStackTrace();
         }
     }
-
 }
 
 
