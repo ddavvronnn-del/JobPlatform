@@ -1,6 +1,5 @@
 package uz.imaan.jobplatform.telegram;
 
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.telegram.telegrambots.bots.TelegramLongPollingBot;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
@@ -69,7 +68,7 @@ public class Telegram extends TelegramLongPollingBot {
             // 5. JOBSEEKER MENYU TUGMALARI ISHLASHI (Jamoadoshingiz servisi chaqiriladi)
             else if (text.equals("Ishlarni ko'rish")) {
                 // jobSeekerService.getAllJobs()...
-                sendMessage(chatId, "Kerakli kategoriyani tanlang:");
+                sendCategoriesMenu(chatId, "Kerakli kategoriyani tanlang:");
             }
             else if (text.equals("Mening arizalarim")) { // <-- SHU QISMINI QO'SHING
                 sendMessage(chatId, "Siz topshirgan arizalar ro'yxati (tez orada ulanadi)...");
