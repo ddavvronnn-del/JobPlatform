@@ -1,6 +1,7 @@
 package uz.imaan.jobplatform.admin.service;
 
 import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.transaction.Transactional;
 import org.springframework.stereotype.Service;
 import uz.imaan.jobplatform.admin.Admin;
 
@@ -58,6 +59,36 @@ public class AdminService {
                 .activeJobs(0L)     // jobRepository.countByStatus("ACTIVE")
                 .completedJobs(0L)  // jobRepository.countByStatus("COMPLETED")
                 .build();
+    }
+
+    @Transactional
+    public void blockUser(AdminDTO blockDTO) {
+        // Пример блокировки Работника (Worker):
+        /*
+        WorkerEntity worker = workerRepository.findById(blockDTO.getUserId())
+                .orElseThrow(() -> new RuntimeException("Пользователь не найден со сгенерированным ID: " + blockDTO.getUserId()));
+
+        worker.setIsActive(false);
+        worker.setBlockReason(blockDTO.getReason());
+        workerRepository.save(worker);
+        */
+
+        System.out.println("Пользователь c ID " + blockDTO.getUserId() + " заблокирован по причине: " + blockDTO.getReason());
+    }
+
+    @Transactional
+    public void unblockUser(Long userId) {
+        // Пример разблокировки Работника (Worker):
+        /*
+        WorkerEntity worker = workerRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("Пользователь не найден с ID: " + userId));
+
+        worker.setIsActive(true);
+        worker.setBlockReason(null);
+        workerRepository.save(worker);
+        */
+
+        System.out.println("Пользователь c ID " + userId + " успешно разблокирован.");
     }
 
 }

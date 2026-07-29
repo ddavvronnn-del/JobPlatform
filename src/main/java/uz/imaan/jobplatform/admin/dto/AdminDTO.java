@@ -24,6 +24,8 @@ import lombok.NoArgsConstructor;
         private Long activeJobs;
         private Long completedJobs;
         private Long totalAdmins;
+        private Long userId;
+        private String reason;
 
 
     }
