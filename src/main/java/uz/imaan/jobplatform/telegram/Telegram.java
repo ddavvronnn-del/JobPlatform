@@ -69,7 +69,7 @@ public class Telegram extends TelegramLongPollingBot {
             // 5. JOBSEEKER MENYU TUGMALARI ISHLASHI (Jamoadoshingiz servisi chaqiriladi)
             else if (text.equals("Ishlarni ko'rish")) {
                 // jobSeekerService.getAllJobs()...
-                sendMessage(chatId, "Mavjud bo'sh ish o'rinlari ro'yxati...");
+                sendMessage(chatId, "Kerakli kategoriyani tanlang:");
             }
             else if (text.equals("Mening arizalarim")) { // <-- SHU QISMINI QO'SHING
                 sendMessage(chatId, "Siz topshirgan arizalar ro'yxati (tez orada ulanadi)...");
