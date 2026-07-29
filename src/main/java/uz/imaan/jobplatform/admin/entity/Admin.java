@@ -1,4 +1,4 @@
-package uz.imaan.jobplatform.admin;
+package uz.imaan.jobplatform.admin.entity;
 
 import jakarta.persistence.*;
 import lombok.Getter;

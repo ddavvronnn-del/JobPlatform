@@ -1,9 +1,8 @@
 package uz.imaan.jobplatform.admin.service;
 
-import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.transaction.Transactional;
 import org.springframework.stereotype.Service;
-import uz.imaan.jobplatform.admin.Admin;
+import uz.imaan.jobplatform.admin.entity.Admin;
 
 import uz.imaan.jobplatform.admin.dto.AdminDTO;
 import uz.imaan.jobplatform.admin.mapper.AdminMapper;
