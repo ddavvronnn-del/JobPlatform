@@ -39,26 +39,13 @@ public class EmployerHandler {
         EmployerState state = states.getOrDefault(chatId, EmployerState.NONE);
         data.putIfAbsent(chatId, new HashMap<>());
 
-        // 1. Tugma bosilganda ro'yxatdan o'tishni boshlash
-        if (text.equals("Employer (Ish beruvchi)")) {
+        // 1. Agar foydalanuvchi "Ish beruvchi (Employer)" tugmasini bossa - Har qanday holatdan ro'yxatdan o'tishga qaytariladi
+        if (text.equals("Ish beruvchi (Employer)") || text.equals("Employer (Ish beruvchi)")) {
             states.put(chatId, EmployerState.WAITING_FOR_NAME);
             return createMessage(chatId, "👤 **Ro'yxatdan o'tish:**\n\nIltimos, ism va familiyangizni kiriting.\n💡 *Misol:* `Ali Valiyev`", null);
         }
 
-        // 2. Menyu tugmalarini tekshirish
-        if (text.equals("Yangi e'lon yaratish")) {
-            if (state == EmployerState.REGISTERED) {
-                states.put(chatId, EmployerState.WAITING_FOR_JOB_TITLE);
-                return createMessage(chatId, "📝 **Ish sarlavhasini kiriting:**\n\n💡 *Misol:* `Java backend dasturchi`", null);
-            } else {
-                states.put(chatId, EmployerState.WAITING_FOR_NAME);
-                return createMessage(chatId, "⚠️ Avval ro'yxatdan o'ting! Ismingizni kiriting:", null);
-            }
-        } else if (text.equals("Mening e'lonlarim")) {
-            return createMessage(chatId, "📂 Siz joylagan e'lonlar ro'yxati bo'sh.", getEmployerMenuKeyboard());
-        }
-
-        // 3. State (qadamlar) bo'yicha ketma-ketlik
+        // 2. Birinchi navbatda FOYDANUVCHINING HOLATINI (STATE) tekshiramiz!
         switch (state) {
             case WAITING_FOR_NAME:
                 if (message.hasText()) {
@@ -118,6 +105,20 @@ public class EmployerHandler {
                 break;
         }
 
+        // 3. Agar foydalanuvchi hech qanday holatda bo'lmasa (REGISTERED yoki NONE), Menyu tugmalari ishlaydi
+        if (text.equals("Yangi e'lon yaratish")) {
+            if (state == EmployerState.REGISTERED) {
+                states.put(chatId, EmployerState.WAITING_FOR_JOB_TITLE);
+                return createMessage(chatId, "📝 **Ish sarlavhasini kiriting:**\n\n💡 *Misol:* `Java backend dasturchi`", null);
+            } else {
+                states.put(chatId, EmployerState.WAITING_FOR_NAME);
+                return createMessage(chatId, "⚠️ Avval ro'yxatdan o'ting! Ismingizni kiriting:\n💡 *Misol:* `Ali Valiyev`", null);
+            }
+        } else if (text.equals("Mening e'lonlarim")) {
+            return createMessage(chatId, "📂 Siz joylagan e me'lonlar ro'yxati bo'sh.", getEmployerMenuKeyboard());
+        }
+
+        // Agar bu handlerga tegishli bo'lmagan xabar bo'lsa null qaytaradi
         return null;
     }
 
