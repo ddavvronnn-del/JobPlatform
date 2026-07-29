@@ -1,5 +1,7 @@
 package uz.imaan.jobplatform.employer.service;
 
+import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
+import org.telegram.telegrambots.meta.api.objects.Message;
 import uz.imaan.jobplatform.employer.EmployerEntity;
 import uz.imaan.jobplatform.employer.dto.EmployerCreateDTO;
 import uz.imaan.jobplatform.employer.dto.EmployerResponseDTO;
@@ -86,6 +88,10 @@ public class EmployerService {
 
     private String fetchFullNameFromGovRegistry(String passport, String inn) {
         return "Shoxrux Sultanboyev";
+    }
+
+    public SendMessage handleEmployer(Message message) {
+        return null;
     }
 }
 
