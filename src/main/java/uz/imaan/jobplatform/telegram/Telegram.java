@@ -49,7 +49,7 @@ public class Telegram extends TelegramLongPollingBot {
 
             // 2. Ish Beruvchi menyusiga tegishli buyruqlar (Sherigingizga yo'naltiriladi)
             if (text.contains("Employer") || text.equals("Yangi e'lon yaratish") || text.equals("Mening e'lonlarim")) {
-                SendMessage response = employerHandler.handleMessage(chatId, text);
+                SendMessage response = employerHandler.handleEmployer(update.getMessage());
                 executeMessage(response);
             }
             // 3. Ish Izlovchiga tegishli buyruqlar (Sizga yo'naltiriladi)

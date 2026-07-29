@@ -14,9 +14,6 @@ import java.util.Map;
 
 @Component
 public class EmployerHandler {
-    public SendMessage handleMessage(Long chatId, String text) {
-        return null;
-    }
 
     public enum EmployerState {
         NONE,
@@ -33,21 +30,39 @@ public class EmployerHandler {
     private final Map<Long, Map<String, String>> data = new HashMap<>();
 
     public SendMessage handleEmployer(Message message) {
+        if (message == null) {
+            return null;
+        }
+
         Long chatId = message.getChatId();
+        String text = message.hasText() ? message.getText() : "";
         EmployerState state = states.getOrDefault(chatId, EmployerState.NONE);
         data.putIfAbsent(chatId, new HashMap<>());
 
-        // 1. Tugma bosilganda jarayonni boshlash
-        if (message.hasText() && message.getText().equals("Ish beruvchi (Employer)")) {
+        // 1. Tugma bosilganda ro'yxatdan o'tishni boshlash
+        if (text.equals("Employer (Ish beruvchi)")) {
             states.put(chatId, EmployerState.WAITING_FOR_NAME);
             return createMessage(chatId, "👤 **Ro'yxatdan o'tish:**\n\nIltimos, ism va familiyangizni kiriting.\n💡 *Misol:* `Ali Valiyev`", null);
         }
 
-        // 2. State bo'yicha ketma-ketlik
+        // 2. Menyu tugmalarini tekshirish
+        if (text.equals("Yangi e'lon yaratish")) {
+            if (state == EmployerState.REGISTERED) {
+                states.put(chatId, EmployerState.WAITING_FOR_JOB_TITLE);
+                return createMessage(chatId, "📝 **Ish sarlavhasini kiriting:**\n\n💡 *Misol:* `Java backend dasturchi`", null);
+            } else {
+                states.put(chatId, EmployerState.WAITING_FOR_NAME);
+                return createMessage(chatId, "⚠️ Avval ro'yxatdan o'ting! Ismingizni kiriting:", null);
+            }
+        } else if (text.equals("Mening e'lonlarim")) {
+            return createMessage(chatId, "📂 Siz joylagan e'lonlar ro'yxati bo'sh.", getEmployerMenuKeyboard());
+        }
+
+        // 3. State (qadamlar) bo'yicha ketma-ketlik
         switch (state) {
             case WAITING_FOR_NAME:
                 if (message.hasText()) {
-                    data.get(chatId).put("fullName", message.getText());
+                    data.get(chatId).put("fullName", text);
                     states.put(chatId, EmployerState.WAITING_FOR_PASSPORT);
                     return createMessage(chatId, "📄 **Pasport ma'lumotingizni kiriting:**\n\n💡 *Misol:* `AD1234567`", null);
                 }
@@ -55,7 +70,7 @@ public class EmployerHandler {
 
             case WAITING_FOR_PASSPORT:
                 if (message.hasText()) {
-                    data.get(chatId).put("passport", message.getText());
+                    data.get(chatId).put("passport", text);
                     states.put(chatId, EmployerState.WAITING_FOR_JOB_TYPE);
                     return createMessage(chatId, "💼 **E'lon yoki ish turini tanlang:**", getJobTypeKeyboard());
                 }
@@ -63,9 +78,8 @@ public class EmployerHandler {
 
             case WAITING_FOR_JOB_TYPE:
                 if (message.hasText()) {
-                    String jobType = message.getText();
-                    if (jobType.contains("Oddiy ish") || jobType.contains("Rasmiy vakansiya")) {
-                        data.get(chatId).put("jobType", jobType);
+                    if (text.contains("Oddiy ish") || text.contains("Rasmiy vakansiya")) {
+                        data.get(chatId).put("jobType", text);
                         states.put(chatId, EmployerState.WAITING_FOR_PHONE);
                         return createMessage(chatId, "📱 **Telefon raqamingizni yuboring:**", getPhoneKeyboard());
                     }
@@ -73,8 +87,8 @@ public class EmployerHandler {
                 break;
 
             case WAITING_FOR_PHONE:
-                String phone = message.hasContact() ? message.getContact().getPhoneNumber() : message.getText();
-                if (phone != null) {
+                String phone = message.hasContact() ? message.getContact().getPhoneNumber() : text;
+                if (!phone.isEmpty()) {
                     data.get(chatId).put("phone", phone);
                     states.put(chatId, EmployerState.REGISTERED);
                     return createMessage(chatId, "✅ **Muvaffaqiyatli ro'yxatdan o'tdingiz!**", getEmployerMenuKeyboard());
@@ -83,7 +97,7 @@ public class EmployerHandler {
 
             case WAITING_FOR_JOB_TITLE:
                 if (message.hasText()) {
-                    data.get(chatId).put("jobTitle", message.getText());
+                    data.get(chatId).put("jobTitle", text);
                     states.put(chatId, EmployerState.WAITING_FOR_SALARY);
                     return createMessage(chatId, "💰 **Ish haqini (maoshni) kiriting:**\n\n💡 *Misol:* `3000000` yoki `150000 kuniga`", null);
                 }
@@ -91,7 +105,7 @@ public class EmployerHandler {
 
             case WAITING_FOR_SALARY:
                 if (message.hasText()) {
-                    data.get(chatId).put("salary", message.getText());
+                    data.get(chatId).put("salary", text);
                     states.put(chatId, EmployerState.REGISTERED);
 
                     String title = data.get(chatId).get("jobTitle");
@@ -102,22 +116,6 @@ public class EmployerHandler {
                             "• Ish: " + title + "\n• Turi: " + type + "\n• Maosh: " + salary, getEmployerMenuKeyboard());
                 }
                 break;
-        }
-
-        // 3. Menyu tugmalari
-        if (message.hasText()) {
-            String text = message.getText();
-            if (text.equals("Yangi e'lon yaratish")) {
-                if (state == EmployerState.REGISTERED) {
-                    states.put(chatId, EmployerState.WAITING_FOR_JOB_TITLE);
-                    return createMessage(chatId, "📝 **Ish sarlavhasini kiriting:**\n\n💡 *Misol:* `Java backend dasturchi`", null);
-                } else {
-                    states.put(chatId, EmployerState.WAITING_FOR_NAME);
-                    return createMessage(chatId, "⚠️ Avval ro'yxatdan o'ting! Ismingizni kiriting:", null);
-                }
-            } else if (text.equals("Mening e'lonlarim")) {
-                return createMessage(chatId, "📂 Siz joylagan e'lonlar ro'yxati bo'sh.", getEmployerMenuKeyboard());
-            }
         }
 
         return null;
