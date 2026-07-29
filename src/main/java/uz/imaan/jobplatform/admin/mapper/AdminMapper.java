@@ -2,7 +2,7 @@ package uz.imaan.jobplatform.admin.mapper;
 
 
 import org.springframework.stereotype.Component;
-import uz.imaan.jobplatform.admin.Admin;
+import uz.imaan.jobplatform.admin.entity.Admin;
 import uz.imaan.jobplatform.admin.dto.AdminDTO;
 
 

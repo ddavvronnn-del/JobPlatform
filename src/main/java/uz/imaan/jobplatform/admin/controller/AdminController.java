@@ -1,6 +1,8 @@
 package uz.imaan.jobplatform.admin.controller;
 
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import uz.imaan.jobplatform.admin.dto.AdminDTO;
 import uz.imaan.jobplatform.admin.service.AdminService;
 import lombok.RequiredArgsConstructor;
@@ -40,5 +42,32 @@ public class AdminController {
             adminService.deleteAdmin(id);
             return ResponseEntity.noContent().build();
         }
-    }
+
+@Operation(
+        summary = "Заблокировать пользователя",
+        description = "Деактивирует аккаунт пользователя и сохраняет причину блокировки"
+)
+@ApiResponses(value = {
+        @ApiResponse(responseCode = "200", description = "Пользователь успешно заблокирован"),
+        @ApiResponse(responseCode = "404", description = "Пользователь не найден")
+})
+@PutMapping("/users/block")
+public ResponseEntity<String> blockUser(@RequestBody AdminDTO blockDTO) {
+    adminService.blockUser(blockDTO);
+    return ResponseEntity.ok("Пользователь успешно заблокирован");
+}
+
+@Operation(
+        summary = "Разблокировать пользователя",
+        description = "Снимает блокировку и восстанавливает активность аккаунта"
+)
+@ApiResponses(value = {
+        @ApiResponse(responseCode = "200", description = "Пользователь успешно разблокирован"),
+        @ApiResponse(responseCode = "404", description = "Пользователь не найден")
+})
+@PutMapping("/users/unblock/{userId}")
+public ResponseEntity<String> unblockUser(@PathVariable Long userId) {
+    adminService.unblockUser(userId);
+    return ResponseEntity.ok("Пользователь успешно разблокирован");
+}}
 
