@@ -35,11 +35,26 @@ public class JobApplication {
     @Column(name = "created_at")
     private LocalDateTime createdAt;
 
+    @Column(name = "updated_at")
+    private LocalDateTime updatedAt;
+
+
     public enum ApplicationStatus {
         PENDING,
         ACCEPTED,
-        REJECTED
+        REJECTED,
+        CANCELLED
     }
 
+    @PrePersist
+    protected void onCreate() {
+        createdAt = LocalDateTime.now();
+        updatedAt = LocalDateTime.now();
+    }
+
+    @PreUpdate
+    protected void onUpdate() {
+        updatedAt = LocalDateTime.now();
+    }
 
 }
