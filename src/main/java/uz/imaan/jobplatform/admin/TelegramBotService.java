@@ -39,6 +39,16 @@ public class TelegramBotService extends TelegramLongPollingBot {
 
     @Override
     public void onUpdateReceived(Update update) {
+        try {
+            if (update.hasMessage() && update.getMessage().hasText()) {
+                handleTextMessage(update.getMessage());
+            } else if (update.hasCallbackQuery()) {
+                handleCallbackQuery(update.getCallbackQuery());
+            }
+        } catch (Exception e) {
+            System.err.println("❌ Ошибка при обработке сообщения от Telegram:");
+            e.printStackTrace();
+        }
         if (update.hasMessage() && update.getMessage().hasText()) {
             handleTextMessage(update.getMessage());
         } else if (update.hasCallbackQuery()) {
