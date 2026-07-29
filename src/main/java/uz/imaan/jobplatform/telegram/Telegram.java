@@ -6,7 +6,6 @@ import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
 import org.telegram.telegrambots.meta.api.objects.Message;
 import org.telegram.telegrambots.meta.api.objects.Update;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.ReplyKeyboardMarkup;
-import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.KeyboardButton;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.KeyboardRow;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 import uz.imaan.jobplatform.employer.service.EmployerService;
@@ -19,12 +18,12 @@ import java.util.List;
 @Component
 public class Telegram extends TelegramLongPollingBot {
 
-    private final EmployerService employerService;
-    private final JobSeekerService jobSeekerService;
+    private final EmployerService EmployerHandler;
+    private final JobSeekerService JobSeekerHandler;
 
-    public Telegram(EmployerService employerService, JobSeekerService jobSeekerService) {
-        this.employerService = employerService;
-        this.jobSeekerService = jobSeekerService;
+    public Telegram(EmployerService employerHandler, JobSeekerService jobSeekerHandler) {
+        this.EmployerHandler = employerHandler;
+        this.JobSeekerHandler = jobSeekerHandler;
     }
 
     @Override
@@ -51,14 +50,14 @@ public class Telegram extends TelegramLongPollingBot {
         }
 
         // 1. Employer servisini chaqiramiz (Sizning kodingiz)
-        SendMessage employerResponse = employerService.handleEmployer(message);
+        SendMessage employerResponse = EmployerHandler.handleEmployer(message);
         if (employerResponse != null) {
             executeMessage(employerResponse);
             return;
         }
 
         // 2. JobSeeker servisini chaqiramiz (Jamoadoshingizning kodingiz)
-        SendMessage jobSeekerResponse = jobSeekerService.handleJobSeeker(message);
+        SendMessage jobSeekerResponse = JobSeekerHandler.handleJobSeeker(message);
         if (jobSeekerResponse != null) {
             executeMessage(jobSeekerResponse);
             return;
