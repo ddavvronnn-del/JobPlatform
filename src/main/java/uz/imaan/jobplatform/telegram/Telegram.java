@@ -4,17 +4,17 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import org.telegram.telegrambots.bots.TelegramLongPollingBot;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
-import org.telegram.telegrambots.meta.api.objects.Message;
 import org.telegram.telegrambots.meta.api.objects.Update;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.ReplyKeyboardMarkup;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.KeyboardButton;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.KeyboardRow;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
-import uz.imaan.jobplatform.employer.service.EmployerService;
-import uz.imaan.jobplatform.jobseeker.service.JobSeekerService;
+
 
 import java.util.ArrayList;
 import java.util.List;
+
+
 
 
 @Component
@@ -37,6 +37,7 @@ public class Telegram extends TelegramLongPollingBot {
 
     @Override
     public void onUpdateReceived(Update update) {
+        // Avval update ichida xabar va matn borligini tekshiramiz
         if (update.hasMessage() && update.getMessage().hasText()) {
             String text = update.getMessage().getText();
             Long chatId = update.getMessage().getChatId();
@@ -47,15 +48,19 @@ public class Telegram extends TelegramLongPollingBot {
                 return;
             }
 
-            // 2. Ish Beruvchi menyusiga tegishli buyruqlar (Sherigingizga yo'naltiriladi)
+            // 2. Ish Beruvchi menyusiga tegishli buyruqlar
             if (text.contains("Employer") || text.equals("Yangi e'lon yaratish") || text.equals("Mening e'lonlarim")) {
                 SendMessage response = employerHandler.handleEmployer(update.getMessage());
-                executeMessage(response);
+                if (response != null) {
+                    executeMessage(response);
+                }
             }
-            // 3. Ish Izlovchiga tegishli buyruqlar (Sizga yo'naltiriladi)
+            // 3. Ish Izlovchiga tegishli buyruqlar
             else {
-                SendMessage response = jobSeekerHandler.handleMessage(chatId, text);
-                executeMessage(response);
+                SendMessage response = jobSeekerHandler.handleJobSeeker(update.getMessage());
+                if (response != null) {
+                    executeMessage(response);
+                }
             }
         }
     }
