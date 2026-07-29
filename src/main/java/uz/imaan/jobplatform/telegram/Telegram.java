@@ -75,7 +75,7 @@ public class Telegram extends TelegramLongPollingBot {
             }
             // 6. KATEGORIYA TUGMALARI BOSILGANDA
             else if (text.equals("IT va Dasturlash") || text.equals("Dizayn") || text.equals("Marketing") || text.equals("Moliya va Hisob-kitob")) {
-                sendMessage(chatId, "Siz tanlagan '" + text + "' kategoriyasi bo'yicha vakansiyalar ro'yxati...");
+                sendCategoriesMenu(chatId, "Siz tanlagan '" + text + "' kategoriyasi bo'yicha vakansiyalar ro'yxati...");
             }
             else if (text.equals("Ortga")) {
                 sendJobSeekerMenu(chatId, "Siz Ish izlovchi menyusidasiz. Kerakli bo'limni tanlang:");
