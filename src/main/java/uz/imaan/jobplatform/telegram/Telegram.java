@@ -1,11 +1,13 @@
 package uz.imaan.jobplatform.telegram;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import org.telegram.telegrambots.bots.TelegramLongPollingBot;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
 import org.telegram.telegrambots.meta.api.objects.Message;
 import org.telegram.telegrambots.meta.api.objects.Update;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.ReplyKeyboardMarkup;
+import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.KeyboardButton;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.KeyboardRow;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 import uz.imaan.jobplatform.employer.service.EmployerService;
@@ -18,67 +20,60 @@ import java.util.List;
 @Component
 public class Telegram extends TelegramLongPollingBot {
 
-    private final EmployerService EmployerHandler;
-    private final JobSeekerService JobSeekerHandler;
+    private final JobSeekerHandler jobSeekerHandler;
+    private final EmployerHandler employerHandler;
 
-    public Telegram(EmployerService employerHandler, JobSeekerService jobSeekerHandler) {
-        this.EmployerHandler = employerHandler;
-        this.JobSeekerHandler = jobSeekerHandler;
+    @Autowired
+    public Telegram(JobSeekerHandler jobSeekerHandler, EmployerHandler employerHandler) {
+        super("8449248126:AAHly6vbiHKNoCUhG_uc1EU2dfuO4DB6Ycg");
+        this.jobSeekerHandler = jobSeekerHandler;
+        this.employerHandler = employerHandler;
     }
 
     @Override
     public String getBotUsername() {
-        return "JobPlatformUzBot";
-    }
-
-    @Override
-    public String getBotToken() {
-        return "8449248126:AAHly6vbiHKNoCUhG_uc1EU2dfuO4DB6Ycg";
+        return "@JobPlatformUzBot";
     }
 
     @Override
     public void onUpdateReceived(Update update) {
-        if (!update.hasMessage()) return;
+        if (update.hasMessage() && update.getMessage().hasText()) {
+            String text = update.getMessage().getText();
+            Long chatId = update.getMessage().getChatId();
 
-        Message message = update.getMessage();
-        Long chatId = message.getChatId();
+            // 1. Asosiy menyular
+            if (text.equals("/start") || text.equals("Asosiy menyu")) {
+                sendRoleSelectionMenu(chatId, "Hush kelibsiz! Rolingizni tanlang:");
+                return;
+            }
 
-        // Start bosilganda asosiy rolni tanlash menyusi
-        if (message.hasText() && message.getText().equals("/start")) {
-            sendRoleMenu(chatId);
-            return;
-        }
-
-        // 1. Employer servisini chaqiramiz (Sizning kodingiz)
-        SendMessage employerResponse = EmployerHandler.handleEmployer(message);
-        if (employerResponse != null) {
-            executeMessage(employerResponse);
-            return;
-        }
-
-        // 2. JobSeeker servisini chaqiramiz (Jamoadoshingizning kodingiz)
-        SendMessage jobSeekerResponse = JobSeekerHandler.handleJobSeeker(message);
-        if (jobSeekerResponse != null) {
-            executeMessage(jobSeekerResponse);
-            return;
+            // 2. Ish Beruvchi menyusiga tegishli buyruqlar (Sherigingizga yo'naltiriladi)
+            if (text.contains("Employer") || text.equals("Yangi e'lon yaratish") || text.equals("Mening e'lonlarim")) {
+                SendMessage response = employerHandler.handleMessage(chatId, text);
+                executeMessage(response);
+            }
+            // 3. Ish Izlovchiga tegishli buyruqlar (Sizga yo'naltiriladi)
+            else {
+                SendMessage response = jobSeekerHandler.handleMessage(chatId, text);
+                executeMessage(response);
+            }
         }
     }
 
-    private void sendRoleMenu(Long chatId) {
-        SendMessage message = new SendMessage();
-        message.setChatId(chatId.toString());
-        message.setText("Xush kelibsiz! Rolni tanlang:");
+    private void sendRoleSelectionMenu(Long chatId, String text) {
+        SendMessage message = new SendMessage(chatId.toString(), text);
+        ReplyKeyboardMarkup keyboardMarkup = new ReplyKeyboardMarkup();
+        keyboardMarkup.setResizeKeyboard(true);
 
-        ReplyKeyboardMarkup keyboard = new ReplyKeyboardMarkup();
-        keyboard.setResizeKeyboard(true);
-        List<KeyboardRow> rows = new ArrayList<>();
+        List<KeyboardRow> keyboard = new ArrayList<>();
         KeyboardRow row = new KeyboardRow();
-        row.add("Ish beruvchi (Employer)");
-        row.add("Ish izlovchi (JobSeeker)");
-        rows.add(row);
-        keyboard.setKeyboard(rows);
+        row.add(new KeyboardButton("Employer (Ish beruvchi)"));
+        row.add(new KeyboardButton("JobSeeker (Ish izlovchi)"));
 
-        message.setReplyMarkup(keyboard);
+        keyboard.add(row);
+        keyboardMarkup.setKeyboard(keyboard);
+        message.setReplyMarkup(keyboardMarkup);
+
         executeMessage(message);
     }
 

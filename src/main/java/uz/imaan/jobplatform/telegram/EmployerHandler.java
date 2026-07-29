@@ -1,5 +1,6 @@
 package uz.imaan.jobplatform.telegram;
 
+import org.springframework.stereotype.Component;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
 import org.telegram.telegrambots.meta.api.objects.Message;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.ReplyKeyboardMarkup;
@@ -11,7 +12,12 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+@Component
 public class EmployerHandler {
+    public SendMessage handleMessage(Long chatId, String text) {
+        return null;
+    }
+
     public enum EmployerState {
         NONE,
         WAITING_FOR_NAME,
