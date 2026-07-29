@@ -1,7 +1,7 @@
 package uz.imaan.jobplatform.jobseeker.mapper;
 
 
-import uz.imaan.jobplatform.jobseeker.controller.UpdateProfileRequest;
+import uz.imaan.jobplatform.jobseeker.dto.UpdateProfileRequest;
 import uz.imaan.jobplatform.jobseeker.dto.JobSeekerProfileDto;
 import uz.imaan.jobplatform.jobseeker.entity.JobSeekerProfile;
 import org.springframework.stereotype.Component;

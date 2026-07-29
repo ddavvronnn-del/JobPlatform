@@ -15,6 +15,7 @@ import org.springframework.web.bind.annotation.*;
 import uz.imaan.jobplatform.jobseeker.dto.ApplyJobRequest;
 import uz.imaan.jobplatform.jobseeker.dto.JobApplicationDto;
 import uz.imaan.jobplatform.jobseeker.dto.JobSeekerProfileDto;
+import uz.imaan.jobplatform.jobseeker.dto.UpdateProfileRequest;
 import uz.imaan.jobplatform.jobseeker.entity.JobApplication;
 import uz.imaan.jobplatform.jobseeker.service.JobSeekerService;
 

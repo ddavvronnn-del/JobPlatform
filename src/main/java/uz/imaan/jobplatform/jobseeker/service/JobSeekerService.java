@@ -8,7 +8,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import uz.imaan.jobplatform.jobseeker.controller.UpdateProfileRequest;
+import uz.imaan.jobplatform.jobseeker.dto.UpdateProfileRequest;
 import uz.imaan.jobplatform.jobseeker.dto.ApplyJobRequest;
 import uz.imaan.jobplatform.jobseeker.dto.JobApplicationDto;
 import uz.imaan.jobplatform.jobseeker.dto.JobSeekerProfileDto;
