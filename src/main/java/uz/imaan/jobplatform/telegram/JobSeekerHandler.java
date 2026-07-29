@@ -2,6 +2,7 @@ package uz.imaan.jobplatform.telegram;
 
 import org.springframework.stereotype.Component;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
+import org.telegram.telegrambots.meta.api.objects.Message;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.ReplyKeyboardMarkup;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardButton;
@@ -13,7 +14,16 @@ import java.util.List;
 
 @Component
 public class JobSeekerHandler {
-    public SendMessage handleMessage(Long chatId, String text) {
+
+    // Telegram.java ushbu metodni chaqiradi
+    public SendMessage handleJobSeeker(Message message) {
+        if (message == null || !message.hasText()) {
+            return null;
+        }
+
+        Long chatId = message.getChatId();
+        String text = message.getText();
+
         switch (text) {
             case "JobSeeker (Ish izlovchi)":
             case "Ortga":
@@ -32,7 +42,8 @@ public class JobSeekerHandler {
                 return getJobsByCategory(chatId, text);
 
             default:
-                return createSimpleMessage(chatId, "Iltimos, pastdagi menyu tugmalaridan foydalaning.");
+                // Agar yuborilgan matn JobSeeker menyusidagi tugmalarga to'g'ri kelmasa, null qaytaramiz
+                return null;
         }
     }
 
@@ -104,6 +115,8 @@ public class JobSeekerHandler {
     }
 
     private SendMessage createSimpleMessage(Long chatId, String text) {
-        return new SendMessage(chatId.toString(), text);
+        SendMessage message = new SendMessage(chatId.toString(), text);
+        message.setParseMode("Markdown");
+        return message;
     }
 }

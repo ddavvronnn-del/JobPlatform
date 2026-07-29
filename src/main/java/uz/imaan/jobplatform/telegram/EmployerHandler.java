@@ -15,6 +15,10 @@ import java.util.Map;
 @Component
 public class EmployerHandler {
 
+    public SendMessage handleMessage(Long chatId, String text) {
+        return null;
+    }
+
     public enum EmployerState {
         NONE,
         WAITING_FOR_NAME,
