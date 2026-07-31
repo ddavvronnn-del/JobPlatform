@@ -1,12 +1,15 @@
 package uz.imaan.jobplatform.admin.service;
 
 import jakarta.transaction.Transactional;
+import jakarta.validation.constraints.NotNull;
 import org.springframework.stereotype.Service;
 import uz.imaan.jobplatform.admin.entity.Admin;
 
 import uz.imaan.jobplatform.admin.dto.AdminDTO;
 import uz.imaan.jobplatform.admin.mapper.AdminMapper;
 import uz.imaan.jobplatform.admin.repostory.AdminRepository;
+import uz.imaan.jobplatform.jobseeker.entity.JobSeekerProfile;
+import uz.imaan.jobplatform.jobseeker.repository.JobSeekerProfileRepository;
 
 
 import java.util.List;
@@ -15,10 +18,12 @@ import java.util.stream.Collectors;
 public class AdminService {
     private final AdminRepository adminRepository;
     private final AdminMapper adminMapper;
+    private final JobSeekerProfileRepository jobSeekerProfileRepository;
 
-    public AdminService(AdminRepository adminRepository, AdminMapper adminMapper) {
+    public AdminService(AdminRepository adminRepository, AdminMapper adminMapper, JobSeekerProfileRepository jobSeekerProfileRepository) {
         this.adminRepository = adminRepository;
         this.adminMapper = adminMapper;
+        this.jobSeekerProfileRepository = jobSeekerProfileRepository;
     }
 
     public List<AdminDTO> getAllAdmins() {
@@ -61,33 +66,53 @@ public class AdminService {
     }
 
     @Transactional
-    public void blockUser(AdminDTO blockDTO) {
-        // Пример блокировки Работника (Worker):
-        /*
-        WorkerEntity worker = workerRepository.findById(blockDTO.getUserId())
-                .orElseThrow(() -> new RuntimeException("Пользователь не найден со сгенерированным ID: " + blockDTO.getUserId()));
+    public void blockUser(@NotNull AdminDTO blockDTO) {
+        // 1. Используем переменную репозитория с маленькой буквы
+        JobSeekerProfile worker = jobSeekerProfileRepository.findByUserId(blockDTO.getUserId())
+                .orElseThrow(() -> new RuntimeException("Пользователь не найден с ID: " + blockDTO.getUserId()));
 
         worker.setIsActive(false);
         worker.setBlockReason(blockDTO.getReason());
-        workerRepository.save(worker);
-        */
 
-        System.out.println("Пользователь c ID " + blockDTO.getUserId() + " заблокирован по причине: " + blockDTO.getReason());
+        // 2. Сохраняем через экземпляр репозитория (с маленькой буквы)
+        jobSeekerProfileRepository.save(worker);
+
+        System.out.println("Пользователь с ID " + blockDTO.getUserId() + " заблокирован по причине: " + blockDTO.getReason());
     }
 
     @Transactional
     public void unblockUser(Long userId) {
-        // Пример разблокировки Работника (Worker):
-        /*
-        WorkerEntity worker = workerRepository.findById(userId)
+        JobSeekerProfile worker = jobSeekerProfileRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("Пользователь не найден с ID: " + userId));
 
         worker.setIsActive(true);
         worker.setBlockReason(null);
-        workerRepository.save(worker);
-        */
 
-        System.out.println("Пользователь c ID " + userId + " успешно разблокирован.");
+        jobSeekerProfileRepository.save(worker);
+
+        System.out.println("Пользователь с ID " + userId + " успешно разблокирован.");
+    }
+
+    @Transactional()
+    public String getWorkerDetails(Long userId) {
+        JobSeekerProfile worker = jobSeekerProfileRepository.findByUserId(userId)
+                .orElseThrow(() -> new RuntimeException("Исполнитель не найден с ID: " + userId));
+
+        return String.format(
+                "👤 **Профиль исполнителя** (ID: %d)\n\n" +
+                        "📌 **Статус:** %s\n" +
+                        "🔒 **Заблокирован:** %s\n" +
+                        "💬 **Причина блокировки:** %s\n\n" +
+                        "📊 **Характеристики:**\n" +
+                        "• Навыки / Опыт: %s\n" +
+                        "• Рейтинг: %.1f ⭐\n" +
+                        "• Выполнено смен: %d",
+                userId,
+                worker.getIsActive() ? "Активен ✅" : "Заблокирован ❌",
+                worker.getIsActive() ? "Нет" : "Да",
+                worker.getBlockReason() != null ? worker.getBlockReason() : "Нет",
+                worker.getRating() != null ? worker.getRating() : 0.0
+        );
     }
 
 }

@@ -36,4 +36,6 @@ public interface JobSeekerProfileRepository extends JpaRepository<JobSeekerProfi
     List<JobSeekerProfile> searchForAdmin(@Param("keyword") String keyword);
 
 
+
+
 }

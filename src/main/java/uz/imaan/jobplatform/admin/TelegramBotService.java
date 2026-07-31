@@ -103,6 +103,77 @@ public class TelegramBotService extends TelegramLongPollingBot {
         }
     }
 
+    public void handleAdminCommand(String text, Long adminChatId) {
+        // Проверка команды на блокировку
+        if (text.startsWith("/block")) {
+            String[] parts = text.split(" ", 3); // Разбиваем на: [/block, userId, reason]
+
+            if (parts.length < 3) {
+                // Если админ ввел неполную команду
+                executeMessage(SendMessage.builder()
+                        .chatId(adminChatId.toString())
+                        .text("⚠️ Формат команды: /block <ID_пользователя> <Причина>")
+                        .build());
+                return;
+            }
+
+            try {
+                Long targetUserId = Long.parseLong(parts[1]);
+                String reason = parts[2];
+
+                AdminDTO blockDTO = new AdminDTO();
+                blockDTO.setUserId(targetUserId);
+                blockDTO.setReason(reason);
+
+                // Вызываем ваш метод блокировки
+                blockUser(blockDTO);
+
+                // Уведомление админу об успешном действии
+                executeMessage(SendMessage.builder()
+                        .chatId(adminChatId.toString())
+                        .text("✅ Пользователь " + targetUserId + " успешно заблокирован.")
+                        .build());
+
+            } catch (NumberFormatException e) {
+                executeMessage(SendMessage.builder()
+                        .chatId(adminChatId.toString())
+                        .text("❌ Неверный ID пользователя. ID должен состоять только из цифр.")
+                        .build());
+            }
+        }
+
+        // Проверка команды на разблокировку
+        else if (text.startsWith("/unblock")) {
+            String[] parts = text.split(" ", 2); // [/unblock, userId]
+
+            if (parts.length < 2) {
+                executeMessage(SendMessage.builder()
+                        .chatId(adminChatId.toString())
+                        .text("⚠️ Формат команды: /unblock <ID_пользователя>")
+                        .build());
+                return;
+            }
+
+            try {
+                Long targetUserId = Long.parseLong(parts[1]);
+
+                // Вызываем ваш метод разблокировки
+                unblockUser(targetUserId);
+
+                executeMessage(SendMessage.builder()
+                        .chatId(adminChatId.toString())
+                        .text("✅ Пользователь " + targetUserId + " разблокирован.")
+                        .build());
+
+            } catch (NumberFormatException e) {
+                executeMessage(SendMessage.builder()
+                        .chatId(adminChatId.toString())
+                        .text("❌ Неверный ID пользователя.")
+                        .build());
+            }
+        }
+    }
+
     // Отправка меню админа
     private void sendAdminMenu(long chatId) {
         SendMessage message = SendMessage.builder()
@@ -157,5 +228,38 @@ public class TelegramBotService extends TelegramLongPollingBot {
         } catch (TelegramApiException e) {
             e.printStackTrace();
         }
+    }
+
+    public void blockUser(AdminDTO blockDTO) {
+        // 1. Вызываем логику блокировки в БД через AdminService
+        adminService.blockUser(blockDTO);
+
+        // 2. Отправляем уведомление заблокированному пользователю в Telegram
+        String blockMessage = String.format(
+                "❌ Ваш аккаунт заблокирован.\nПричина: %s",
+                blockDTO.getReason()
+        );
+
+        SendMessage sendMessage = SendMessage.builder()
+                .chatId(blockDTO.getUserId().toString())
+                .text(blockMessage)
+                .build();
+
+        executeMessage(sendMessage);
+    }
+
+    public void unblockUser(Long userId) {
+        // 1. Снимаем блокировку в БД
+        adminService.unblockUser(userId);
+
+        // 2. Отправляем уведомление пользователю
+        String unblockMessage = "✅ Ваш аккаунт успешно разблокирован! Вы снова можете пользоваться ботом.";
+
+        SendMessage sendMessage = SendMessage.builder()
+                .chatId(userId.toString())
+                .text(unblockMessage)
+                .build();
+
+        executeMessage(sendMessage);
     }
 }
