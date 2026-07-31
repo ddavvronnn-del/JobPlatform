@@ -4,6 +4,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import org.telegram.telegrambots.bots.TelegramLongPollingBot;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
+import org.telegram.telegrambots.meta.api.objects.Message;
 import org.telegram.telegrambots.meta.api.objects.Update;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.ReplyKeyboardMarkup;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.KeyboardButton;
@@ -13,7 +14,6 @@ import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 
 import java.util.ArrayList;
 import java.util.List;
-
 
 
 
@@ -37,24 +37,31 @@ public class Telegram extends TelegramLongPollingBot {
 
     @Override
     public void onUpdateReceived(Update update) {
-        // Avval update ichida xabar va matn borligini tekshiramiz
-        if (update.hasMessage() && update.getMessage().hasText()) {
-            String text = update.getMessage().getText();
-            Long chatId = update.getMessage().getChatId();
+        if (update.hasMessage()) {
+            Message message = update.getMessage();
+            Long chatId = message.getChatId();
+            // 1. Asosiy menyular va buyruqlar (faqat matn bo'lganda)
+            if (message.hasText()) {
+                String text = message.getText();
 
-            // 1. Asosiy menyular
-            if (text.equals("/start") || text.equals("Asosiy menyu")) {
-                sendRoleSelectionMenu(chatId, "Hush kelibsiz! Rolingizni tanlang:");
-                return;
-            }
+                if (text.equals("/start") || text.equals("Asosiy menyu")) {
+                    sendRoleSelectionMenu(chatId, "Hush kelibsiz! Rolingizni tanlang:");
+                    return;
+                }
 
-            // 2. Ish Beruvchi menyusiga tegishli buyruqlar
-            if (text.contains("Employer") || text.equals("Yangi e'lon yaratish") || text.equals("Mening e'lonlarim")) {
-                SendMessage response = employerHandler.handleEmployer(update.getMessage());
-                if (response != null) {
-                    executeMessage(response);
+                if (text.contains("Employer") || text.equals("Yangi e'lon yaratish") || text.equals("Mening e'lonlarim")) {
+                    SendMessage response = employerHandler.handleEmployer(message);
+                    if (response != null) executeMessage(response);
+                    return;
                 }
             }
+
+            // 2. Qolgan barcha xabarlar (matn, kontakt va h.k.) Ish izlovchiga yo'naltiriladi
+            SendMessage response = jobSeekerHandler.handleJobSeeker(message);
+            if (response != null) {
+                executeMessage(response);
+            }
+        }
             // 3. Ish Izlovchiga tegishli buyruqlar
             else {
                 SendMessage response = jobSeekerHandler.handleJobSeeker(update.getMessage());
@@ -62,7 +69,7 @@ public class Telegram extends TelegramLongPollingBot {
                     executeMessage(response);
                 }
             }
-        }
+
     }
 
     private void sendRoleSelectionMenu(Long chatId, String text) {
