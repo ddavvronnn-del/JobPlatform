@@ -273,20 +273,82 @@ public class JobSeekerHandler {
             }
         }
 
-        // 7. Ichki menyular
-        if (state == JobSeekerState.WALLET_MENU) {
-            if (text.equals("💳 Bank kartasi qo'shish")) {
-                return createMessage(chatId, "💳 Karta raqamingizni kiriting (16 xona):", getSubBackKeyboard());
-            } else if (text.equals("💰 Hisob balansi")) {
-                return createMessage(chatId, "💰 **Joriy balansingiz:** 0 so'm", getWalletKeyboard());
-            } else if (text.equals("💸 Pul yechish")) {
-                return createMessage(chatId, "⚠️ Pul yechish uchun minimal summa: 50,000 so'm.", getWalletKeyboard());
+        // 7. Ichki menyular (Profil, Hamyon, Sozlamalar va Active Jobs)
+        if(state == JobSeekerState.PROFILE_MENU){
+            JobSeekerProfile profile = profileOpt.orElse(new JobSeekerProfile());
+            double r = profile.getRating() != null ? profile.getRating() : 0.0;
+            if (text.contains("Ma'lumotlar")){
+                String profileInfo = String.format(
+                        "👤 **Profil ma'lumotlari:**\n\n" +
+                                "📌 **F.I.O:** %s\n" +
+                                "📞 **Tel:** %s\n" +
+                                "⭐ **Reyting:** %.1f\n" +
+                                "💼 **Kasb:** %s",
+                        profile.getFullName() != null ? profile.getFullName() : "Kiritilmagan",
+                        profile.getPhoneNumber() != null ? profile.getPhoneNumber() : "Kiritilmagan",
+                        r,
+                        profile.getProfession() != null ? profile.getProfession() : "Ko'rsatilmagan"
+                );
+                return createMessage(chatId, profileInfo, getProfileKeyboard());
+            }
+            if (text.contains("Portfolio")) {
+                return createMessage(chatId, "📁 **Portfolio bo'limi:**\n\nHozircha portfolio yuklanmagan. Loyihalaringiz havolasini (link) yuborishingiz mumkin:", getSubBackKeyboard());
+            }
+
+            if (text.contains("Reyting")) {
+                return createMessage(chatId, String.format("⭐ **Sizning joriy reytingingiz:** %.1f / 5.0\n\nBajarilgan ishlar va ish beruvchilar bahosi asosida shakllanadi.", r), getProfileKeyboard());
+            }
+
+            if (text.contains("Rasm")) {
+                return createMessage(chatId, "🖼 **Profil rasmi:**\n\nProfil rasmingizni yangilash uchun botga rasm yuboring:", getSubBackKeyboard());
+            }
+
+            if (text.contains("Kasb")) {
+                String profession = profile.getProfession() != null ? profile.getProfession() : "Ko'rsatilmagan";
+                return createMessage(chatId, String.format("💼 **Joriy kasbingiz:** %s\n\nKasbingizni o'zgartirish uchun yangi kasb nomini kiriting (Masalan: Java Developer):", profession), getSubBackKeyboard());
+            }
+
+            if (text.contains("Tahrirlash")) {
+                return createMessage(chatId, "✏️ **Profilni tahrirlash:**\n\nYangi ism va familiyangizni kiriting:", getSubBackKeyboard());
             }
         }
 
-        if (state == JobSeekerState.PROFILE_MENU) {
-            if (text.equals("✏️ Tahrirlash")) {
-                return createMessage(chatId, "Ismingizni o'zgartirish uchun yangi ism kiriting:", getSubBackKeyboard());
+        if (state == JobSeekerState.WALLET_MENU) {
+            if (text.contains("Bank kartasi")) {
+                return createMessage(chatId, "💳 Karta raqamingizni kiriting (16 xona):", getSubBackKeyboard());
+            }
+            if (text.contains("Hisob balansi")) {
+                return createMessage(chatId, "💰 **Joriy balansingiz:** 0 so'm", getWalletKeyboard());
+            }
+            if (text.contains("Pul yechish")) {
+                return createMessage(chatId, "⚠️ Pul yechish uchun minimal summa: 50,000 so'm.", getWalletKeyboard());
+            }
+            if (text.contains("To'lov usullari")) {
+                return createMessage(chatId, "💳 **Mavjud to'lov usullari:**\n\n- Click\n- Payme\n- Uzum Bank", getWalletKeyboard());
+            }
+            if (text.contains("To'lov tarixi")) {
+                return createMessage(chatId, "📜 **To'lovlar tarixi:**\n\nHozircha amaliyotlar mavjud emas.", getWalletKeyboard());
+            }
+        }
+
+        if (state == JobSeekerState.SETTINGS_MENU) {
+            if (text.contains("Til")) {
+                return createMessage(chatId, "🌐 **Tilni tanlang:**\n\n🇺🇿 O'zbek tili (Aktiv)", getSettingsKeyboard());
+            }
+            if (text.contains("Maxfiylik")) {
+                return createMessage(chatId, "🔒 **Maxfiylik sozlamalari:**\n\nSizning ma'lumotlaringiz xavfsiz saqlanadi.", getSettingsKeyboard());
+            }
+            if (text.contains("Bildirishnoma")) {
+                return createMessage(chatId, "🔔 **Bildirishnomalar:** Yoniq ✅", getSettingsKeyboard());
+            }
+            if (text.contains("Yordam")) {
+                return createMessage(chatId, "❓ **Yordam markazi:**\n\nMuammo yuzaga kelsa, admin bilan bog'laning.", getSettingsKeyboard());
+            }
+        }
+
+        if (state == JobSeekerState.ACTIVE_JOBS) {
+            if (text.contains("Joriy ishlar") || text.contains("Topshiriqlar") || text.contains("Vazifalar")) {
+                return createMessage(chatId, "📋 Hozircha faol ishlaringiz mavjud emas.", getActiveJobsKeyboard());
             }
         }
 
