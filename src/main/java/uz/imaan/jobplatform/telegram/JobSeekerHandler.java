@@ -114,7 +114,7 @@ public class JobSeekerHandler {
                 case "👤 Profilim":
                     states.put(chatId, JobSeekerState.PROFILE_MENU);
                     JobSeekerProfile profile = profileOpt.orElse(new JobSeekerProfile());
-                    String info = String.format("👤 **Profil ma'lumotlari:**\n\n📌 **F.I.O:** %s\n📞 **Tel:** %s\n⭐ **Reyting:** 5.0\n💼 **Kasb:** Ko'rsatilmagan",
+                    String info = String.format("👤 **Profil ma'lumotlari:**\n\n📌 **F.I.O:** %s\n📞 **Tel:** %s\n⭐ **Reyting:** 0.0\n💼 **Kasb:** Ko'rsatilmagan",
                             profile.getFullName() != null ? profile.getFullName() : "Kiritilmagan",
                             profile.getPhoneNumber() != null ? profile.getPhoneNumber() : "Kiritilmagan");
                     return createMessage(chatId, info, getProfileKeyboard());
