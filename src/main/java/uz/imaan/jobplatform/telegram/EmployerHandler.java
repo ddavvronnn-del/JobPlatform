@@ -1,5 +1,6 @@
 package uz.imaan.jobplatform.telegram;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
 import org.telegram.telegrambots.meta.api.objects.Message;
@@ -8,8 +9,9 @@ import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.Keyboard
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.KeyboardRow;
 import uz.imaan.jobplatform.employer.job.JobStore;
 import uz.imaan.jobplatform.employer.job.JobVacancy;
-
-import java.util.*;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 @Component
@@ -34,6 +36,7 @@ public class EmployerHandler {
     private final Map<Long, EmployerState> states = new ConcurrentHashMap<>();
     private final Map<Long, Map<String, String>> data = new ConcurrentHashMap<>();
 
+    @Autowired
     public EmployerHandler(JobStore jobStore) {
         this.jobStore = jobStore;
     }
@@ -53,13 +56,13 @@ public class EmployerHandler {
             return createMessage(chatId, "🏢 **Ish beruvchi menyusi**\n\nKerakli bo'limni tanlang:", getMainMenuKeyboard());
         }
 
-        // 2. Initial entry / Registration flow
-        if (text.equals("Ish beruvchi (Employer)") || text.equals("Employer (Ish beruvchi)")) {
-            // Ro'yxatdan o'tish jarayonini boshlash
+        // 2. Rolga birinchi kirish / Ro'yxatdan o'tish
+        if (text.equals("Employer (Ish beruvchi)") || text.equals("Ish beruvchi (Employer)")) {
             states.put(chatId, EmployerState.WAITING_FOR_NAME);
             return createMessage(chatId, "👤 **Ish beruvchi sifatida ro'yxatdan o'tish:**\n\nIltimos, ism va familiyangizni kiriting.\n💡 *Misol:* `Ali Valiyev`", getCancelKeyboard());
         }
 
+        // 3. Ro'yxatdan o me'yorida o'tish ketma-ketligi
         if (state == EmployerState.WAITING_FOR_NAME && message.hasText()) {
             data.get(chatId).put("fullName", text);
             states.put(chatId, EmployerState.WAITING_FOR_PASSPORT);
@@ -87,7 +90,7 @@ public class EmployerHandler {
             }
         }
 
-        // 3. Main menu handler
+        // 4. Main Menu commands
         if (state == EmployerState.MAIN_MENU) {
             switch (text) {
                 case "➕ Yangi e'lon yaratish":
@@ -104,7 +107,7 @@ public class EmployerHandler {
             }
         }
 
-        // 4. E'LON YARATISH KETMA-KETLIGI (VACANCY CREATION)
+        // 5. E'lon yaratish ketma-ketligi
         if (state == EmployerState.WAITING_FOR_JOB_TITLE && message.hasText()) {
             data.get(chatId).put("jobTitle", text);
             states.put(chatId, EmployerState.WAITING_FOR_CATEGORY);
@@ -125,7 +128,7 @@ public class EmployerHandler {
             String salary = data.get(chatId).get("salary");
             String type = data.get(chatId).getOrDefault("jobType", "To'liq kun");
 
-            // JobStore'ga yangi vakansiyani saqlaymiz
+            // JobStore ga saqlaymiz
             JobVacancy vacancy = new JobVacancy(chatId, title, category, type, salary);
             jobStore.addVacancy(vacancy);
 
@@ -143,14 +146,28 @@ public class EmployerHandler {
             return createMessage(chatId, successText, getMainMenuKeyboard());
         }
 
-        return createMessage(chatId, "Iltimos, tugmalardan birini tanlang.", getMainMenuKeyboard());
+        // Statik tugmalarni tekshirish (agarda state o'zgarmay qolgan bo'lsa)
+        if (text.equals("➕ Yangi e'lon yaratish")) {
+            states.put(chatId, EmployerState.WAITING_FOR_JOB_TITLE);
+            return createMessage(chatId, "📝 **Ish sarlavhasini kiriting:**\n\n💡 *Misol:* `Java backend dasturchi`", getCancelKeyboard());
+        } else if (text.equals("📂 Mening e'lonlarim")) {
+            states.put(chatId, EmployerState.MY_VACANCIES);
+            return handleShowMyVacancies(chatId);
+        }
+
+        // Agarda employer holatida bo'lmasa, NULL qaytaradi (Telegram.java orqali JobSeeker'ga o'tishi uchun)
+        if (state == EmployerState.NONE) {
+            return null;
+        }
+
+        return createMessage(chatId, "Iltimos, employer menyusidagi tugmalardan birini tanlang.", getMainMenuKeyboard());
     }
 
     private SendMessage handleShowMyVacancies(Long chatId) {
         List<JobVacancy> myVacancies = jobStore.getVacanciesByEmployer(chatId);
 
         if (myVacancies.isEmpty()) {
-            return createMessage(chatId, "📂 Siz hali hech qanday e me'lon joylamagansiz.", getSubBackKeyboard());
+            return createMessage(chatId, "📂 Siz hali hech qanday e'lon joylamagansiz.", getSubBackKeyboard());
         }
 
         StringBuilder sb = new StringBuilder("📂 **Siz joylagan e'lonlar ro'yxati:**\n\n");

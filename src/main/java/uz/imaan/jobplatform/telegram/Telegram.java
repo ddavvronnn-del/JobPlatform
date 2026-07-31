@@ -11,17 +11,25 @@ import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.Keyboard
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.KeyboardRow;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 
-
 import java.util.ArrayList;
 import java.util.List;
-
-
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 @Component
 public class Telegram extends TelegramLongPollingBot {
 
+    public enum UserRole {
+        NONE,
+        EMPLOYER,
+        JOB_SEEKER
+    }
+
     private final JobSeekerHandler jobSeekerHandler;
     private final EmployerHandler employerHandler;
+
+    // Har bir chatId bo'yicha rolini eslab qolamiz
+    private final Map<Long, UserRole> userRoles = new ConcurrentHashMap<>();
 
     @Autowired
     public Telegram(JobSeekerHandler jobSeekerHandler, EmployerHandler employerHandler) {
@@ -37,39 +45,39 @@ public class Telegram extends TelegramLongPollingBot {
 
     @Override
     public void onUpdateReceived(Update update) {
-        if (update.hasMessage()) {
-            Message message = update.getMessage();
-            Long chatId = message.getChatId();
-            // 1. Asosiy menyular va buyruqlar (faqat matn bo'lganda)
-            if (message.hasText()) {
-                String text = message.getText();
+        if (!update.hasMessage()) return;
 
-                if (text.equals("/start") || text.equals("Asosiy menyu")) {
-                    sendRoleSelectionMenu(chatId, "Hush kelibsiz! Rolingizni tanlang:");
-                    return;
-                }
+        Message message = update.getMessage();
+        Long chatId = message.getChatId();
+        String text = message.hasText() ? message.getText() : "";
 
-                if (text.contains("Employer") || text.equals("Yangi e'lon yaratish") || text.equals("Mening e'lonlarim")) {
-                    SendMessage response = employerHandler.handleEmployer(message);
-                    if (response != null) executeMessage(response);
-                    return;
-                }
-            }
-
-            // 2. Qolgan barcha xabarlar (matn, kontakt va h.k.) Ish izlovchiga yo'naltiriladi
-            SendMessage response = jobSeekerHandler.handleJobSeeker(message);
-            if (response != null) {
-                executeMessage(response);
-            }
+        // 1. /start yoki "Asosiy menyu" bosilsa
+        if (text.equals("/start") || text.equals("Asosiy menyu")) {
+            userRoles.put(chatId, UserRole.NONE);
+            sendRoleSelectionMenu(chatId, "Hush kelibsiz! Rolingizni tanlang:");
+            return;
         }
-            // 3. Ish Izlovchiga tegishli buyruqlar
-            else {
-                SendMessage response = jobSeekerHandler.handleJobSeeker(update.getMessage());
-                if (response != null) {
-                    executeMessage(response);
-                }
-            }
 
+        // 2. Rol tanlanganda userRoles xaritasida saqlaymiz
+        if (text.contains("Employer (Ish beruvchi)") || text.contains("Ish beruvchi (Employer)")) {
+            userRoles.put(chatId, UserRole.EMPLOYER);
+        } else if (text.contains("JobSeeker (Ish izlovchi)") || text.contains("Ish izlovchi (JobSeeker)")) {
+            userRoles.put(chatId, UserRole.JOB_SEEKER);
+        }
+
+        UserRole role = userRoles.getOrDefault(chatId, UserRole.NONE);
+
+        // 3. Tanlangan roliga muvofiq Xabar FAQAT tegishli handlerga boradi
+        if (role == UserRole.EMPLOYER) {
+            SendMessage response = employerHandler.handleEmployer(message);
+            if (response != null) executeMessage(response);
+        } else if (role == UserRole.JOB_SEEKER) {
+            SendMessage response = jobSeekerHandler.handleJobSeeker(message);
+            if (response != null) executeMessage(response);
+        } else {
+            // Rol hali tanlanmagan bo'lsa
+            sendRoleSelectionMenu(chatId, "Iltimos, avval rolingizni tanlang:");
+        }
     }
 
     private void sendRoleSelectionMenu(Long chatId, String text) {
@@ -97,7 +105,3 @@ public class Telegram extends TelegramLongPollingBot {
         }
     }
 }
-
-
-
-
