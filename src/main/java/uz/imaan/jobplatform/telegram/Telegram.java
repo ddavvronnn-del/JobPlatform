@@ -79,6 +79,7 @@ public class Telegram extends TelegramLongPollingBot {
             sendRoleSelectionMenu(chatId, "Iltimos, avval rolingizni tanlang:");
         }
     }
+    
 
     private void sendRoleSelectionMenu(Long chatId, String text) {
         SendMessage message = new SendMessage(chatId.toString(), text);
