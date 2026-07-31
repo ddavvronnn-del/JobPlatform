@@ -45,6 +45,15 @@ public class JobSeekerProfile {
     @Column(name = "wallet_balance", precision = 19, scale = 2)
     private BigDecimal walletBalance;
 
+    // --- ADMIN UCHUN BLOCK/UNBLOCK FIELDLARI ---
+    @Builder.Default
+    @Column(name = "is_active")
+    private Boolean isActive = true;
+
+    @Column(name = "block_reason")
+    private String blockReason;
+    // --------------------------------------------
+
     @OneToMany(mappedBy = "jobSeeker", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default
     private List<BankCard> bankCards = new ArrayList<>();
