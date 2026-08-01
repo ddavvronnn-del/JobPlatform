@@ -35,6 +35,7 @@ public class JobSeekerProfile {
     private String profession;
     private Double rating;
     private String language;
+    private String passportNumber;
 
     @Column(name = "avatar_url")
     private String avatarUrl;
