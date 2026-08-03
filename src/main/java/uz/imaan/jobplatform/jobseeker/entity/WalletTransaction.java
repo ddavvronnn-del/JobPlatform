@@ -36,4 +36,9 @@ public class WalletTransaction {
         WITHDRAW
     }
 
+    @PrePersist
+    protected void onCreate() {
+        createdAt = LocalDateTime.now();
+    }
+
 }

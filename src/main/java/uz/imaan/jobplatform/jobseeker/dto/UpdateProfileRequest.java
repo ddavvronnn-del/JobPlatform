@@ -18,6 +18,7 @@ public class UpdateProfileRequest {
     private String profession;
     private String language;
     private String portfolio;
+    private String passportNumber;
 
 
 

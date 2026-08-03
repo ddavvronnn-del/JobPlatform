@@ -9,6 +9,7 @@ import org.telegram.telegrambots.updatesreceivers.DefaultBotSession;
 import uz.imaan.jobplatform.admin.TelegramBotService;
 
 @Component
+
 public class BotInitializerForAdmin {
 
     private final TelegramBotService botService;

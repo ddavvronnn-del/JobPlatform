@@ -24,7 +24,7 @@ public class BankCard {
     private String cardNumber;
 
     @Column(name = "expire_date", nullable = false)
-    private String expireDate;
+    private String expireDate; // MM/YY
 
     @Column(name = "card_holder_name")
     private String cardHolderName;

@@ -2,6 +2,7 @@ package uz.imaan.jobplatform.jobseeker.controller;
 
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import uz.imaan.jobplatform.jobseeker.dto.BankCardRequest;
@@ -13,7 +14,7 @@ import java.math.BigDecimal;
 import java.util.List;
 
 
-
+@Slf4j
 @RestController
 @RequestMapping("/api/v1/job-seeker/wallet")
 @RequiredArgsConstructor

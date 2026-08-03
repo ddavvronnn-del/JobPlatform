@@ -23,5 +23,6 @@ public class JobSeekerProfileDto {
     private String language;
     private String portfolio;
     private BigDecimal walletBalance;
+    private String passportNumber;
 
 }

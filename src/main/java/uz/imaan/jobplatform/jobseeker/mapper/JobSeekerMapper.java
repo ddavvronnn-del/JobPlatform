@@ -23,6 +23,7 @@ public class JobSeekerMapper {
                 .language(entity.getLanguage())
                 .portfolio(entity.getPortfolio())
                 .walletBalance(entity.getWalletBalance())
+                .passportNumber(entity.getPassportNumber())
                 .build();
     }
 
@@ -46,6 +47,9 @@ public class JobSeekerMapper {
         }
         if (dto.getPortfolio() != null) {
             entity.setPortfolio(dto.getPortfolio());
+        }
+        if (dto.getPassportNumber() != null) {
+            entity.setPassportNumber(dto.getPassportNumber());
         }
     }
 

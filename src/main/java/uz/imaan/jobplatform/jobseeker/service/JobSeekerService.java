@@ -170,6 +170,19 @@ public class JobSeekerService {
 
 
     public SendMessage handleJobSeeker(Message message) {
-        return null;
+        String text = message.getText();
+        Long chatId = message.getChatId();
+
+        SendMessage sendMessage = new SendMessage();
+        sendMessage.setChatId(chatId.toString());
+        sendMessage.setText("👋 JobSeeker menyusi!\n\n" +
+                "📌 Komandalar:\n" +
+                "/profile - Profilim\n" +
+                "/jobs - Ish qidirish\n" +
+                "/wallet - Hamyon\n" +
+                "/applications - Arizalar\n" +
+                "/settings - Sozlamalar");
+
+        return sendMessage;
     }
 }
