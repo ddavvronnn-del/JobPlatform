@@ -24,7 +24,7 @@ public class TelegramBotService extends TelegramLongPollingBot {
 
     // Передаем токен напрямую в super(), минуя @Value и application.properties
     public TelegramBotService(AdminService adminService) {
-        super("8470148420:AAEcjcwI9sKspY940FiB7V5gqmAjQvgVhPY");
+        super("8470148420:AAEcjcwI9sKspY94OFiB7V5gqmAjQvgVhPY");
         this.adminService = adminService;
     }
 
