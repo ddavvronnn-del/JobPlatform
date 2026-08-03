@@ -19,16 +19,12 @@ import java.util.List;
 @Service
 public class TelegramBotService extends TelegramLongPollingBot {
 
-    private final String botUsername;
+    private final String botUsername = "jobplatform_admin_bot";
     private final AdminService adminService;
 
-    // AYNAN SHU KONSTRUKTOR QOLSIN:
-    public TelegramBotService(
-            @Value("${jobplatform_admin_bot}") String botUsername,
-            @Value("${8470148420:AAEcjcwI9sKspY94OFiB7V5gqmAjQvgVhPY}") String botToken,
-            AdminService adminService) {
-        super(botToken);
-        this.botUsername = botUsername;
+    // Передаем токен напрямую в super(), минуя @Value и application.properties
+    public TelegramBotService(AdminService adminService) {
+        super("8470148420:AAEcjcwI9sKspY940FiB7V5gqmAjQvgVhPY");
         this.adminService = adminService;
     }
 
