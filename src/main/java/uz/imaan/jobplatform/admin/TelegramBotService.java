@@ -24,8 +24,8 @@ public class TelegramBotService extends TelegramLongPollingBot {
     private final AdminService adminService;
 
     public TelegramBotService(
-            @Value("${telegram.bot.token}") String botToken,
-            @Value("${telegram.bot.username}") String botUsername,
+            @Value("${8470148420:AAEcjcwI9sKspY94OFiB7V5gqmAjQvgVhPY}") String botToken,
+            @Value("${jobplatform_admin_bot}") String botUsername,
             AdminService adminService) {
         super(botToken);
         this.botUsername = botUsername;
