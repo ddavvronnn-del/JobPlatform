@@ -33,7 +33,7 @@ public class Telegram extends TelegramLongPollingBot {
 
     @Autowired
     public Telegram(JobSeekerHandler jobSeekerHandler, EmployerHandler employerHandler) {
-        super("8449248126:AAHly6vbiHKNoCUhG_uc1EU2dfuO4DB6Ycg");
+        super("8449248126:AAFPgTpsBD2o1k_cp8YbG8_wqp9o8KnRCss");
         this.jobSeekerHandler = jobSeekerHandler;
         this.employerHandler = employerHandler;
     }

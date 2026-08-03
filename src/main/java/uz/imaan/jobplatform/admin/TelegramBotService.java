@@ -1,6 +1,5 @@
 package uz.imaan.jobplatform.admin;
 
-
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.telegram.telegrambots.bots.TelegramLongPollingBot;
@@ -23,9 +22,10 @@ public class TelegramBotService extends TelegramLongPollingBot {
     private final String botUsername;
     private final AdminService adminService;
 
+    // AYNAN SHU KONSTRUKTOR QOLSIN:
     public TelegramBotService(
-            @Value("${8470148420:AAEcjcwI9sKspY94OFiB7V5gqmAjQvgVhPY}") String botToken,
             @Value("${jobplatform_admin_bot}") String botUsername,
+            @Value("${8470148420:AAEcjcwI9sKspY94OFiB7V5gqmAjQvgVhPY}") String botToken,
             AdminService adminService) {
         super(botToken);
         this.botUsername = botUsername;
@@ -49,10 +49,8 @@ public class TelegramBotService extends TelegramLongPollingBot {
             System.err.println("❌ Ошибка при обработке сообщения от Telegram:");
             e.printStackTrace();
         }
-
     }
 
-    // Обработка текстовых сообщений
     private void handleTextMessage(Message message) {
         long chatId = message.getChatId();
         long userId = message.getFrom().getId();
@@ -69,7 +67,6 @@ public class TelegramBotService extends TelegramLongPollingBot {
         }
     }
 
-    // Обработка нажатий инлайн-кнопок
     private void handleCallbackQuery(CallbackQuery callbackQuery) {
         long userId = callbackQuery.getFrom().getId();
         long chatId = callbackQuery.getMessage().getChatId();
@@ -104,12 +101,10 @@ public class TelegramBotService extends TelegramLongPollingBot {
     }
 
     public void handleAdminCommand(String text, Long adminChatId) {
-        // Проверка команды на блокировку
         if (text.startsWith("/block")) {
-            String[] parts = text.split(" ", 3); // Разбиваем на: [/block, userId, reason]
+            String[] parts = text.split(" ", 3);
 
             if (parts.length < 3) {
-                // Если админ ввел неполную команду
                 executeMessage(SendMessage.builder()
                         .chatId(adminChatId.toString())
                         .text("⚠️ Формат команды: /block <ID_пользователя> <Причина>")
@@ -125,10 +120,8 @@ public class TelegramBotService extends TelegramLongPollingBot {
                 blockDTO.setUserId(targetUserId);
                 blockDTO.setReason(reason);
 
-                // Вызываем ваш метод блокировки
                 blockUser(blockDTO);
 
-                // Уведомление админу об успешном действии
                 executeMessage(SendMessage.builder()
                         .chatId(adminChatId.toString())
                         .text("✅ Пользователь " + targetUserId + " успешно заблокирован.")
@@ -140,11 +133,8 @@ public class TelegramBotService extends TelegramLongPollingBot {
                         .text("❌ Неверный ID пользователя. ID должен состоять только из цифр.")
                         .build());
             }
-        }
-
-        // Проверка команды на разблокировку
-        else if (text.startsWith("/unblock")) {
-            String[] parts = text.split(" ", 2); // [/unblock, userId]
+        } else if (text.startsWith("/unblock")) {
+            String[] parts = text.split(" ", 2);
 
             if (parts.length < 2) {
                 executeMessage(SendMessage.builder()
@@ -157,7 +147,6 @@ public class TelegramBotService extends TelegramLongPollingBot {
             try {
                 Long targetUserId = Long.parseLong(parts[1]);
 
-                // Вызываем ваш метод разблокировки
                 unblockUser(targetUserId);
 
                 executeMessage(SendMessage.builder()
@@ -174,7 +163,6 @@ public class TelegramBotService extends TelegramLongPollingBot {
         }
     }
 
-    // Отправка меню админа
     private void sendAdminMenu(long chatId) {
         SendMessage message = SendMessage.builder()
                 .chatId(chatId)
@@ -185,7 +173,6 @@ public class TelegramBotService extends TelegramLongPollingBot {
         executeMessage(message);
     }
 
-    // Клавиатура админки
     private InlineKeyboardMarkup getAdminKeyboard() {
         InlineKeyboardButton statsBtn = InlineKeyboardButton.builder()
                 .text("📊 Статистика платформы")
@@ -197,7 +184,6 @@ public class TelegramBotService extends TelegramLongPollingBot {
                 .build();
     }
 
-    // Вспомогательные методы отправки
     private void sendTextMessage(long chatId, String text) {
         SendMessage message = SendMessage.builder()
                 .chatId(chatId)
@@ -231,10 +217,8 @@ public class TelegramBotService extends TelegramLongPollingBot {
     }
 
     public void blockUser(AdminDTO blockDTO) {
-        // 1. Вызываем логику блокировки в БД через AdminService
         adminService.blockUser(blockDTO);
 
-        // 2. Отправляем уведомление заблокированному пользователю в Telegram
         String blockMessage = String.format(
                 "❌ Ваш аккаунт заблокирован.\nПричина: %s",
                 blockDTO.getReason()
@@ -249,10 +233,8 @@ public class TelegramBotService extends TelegramLongPollingBot {
     }
 
     public void unblockUser(Long userId) {
-        // 1. Снимаем блокировку в БД
         adminService.unblockUser(userId);
 
-        // 2. Отправляем уведомление пользователю
         String unblockMessage = "✅ Ваш аккаунт успешно разблокирован! Вы снова можете пользоваться ботом.";
 
         SendMessage sendMessage = SendMessage.builder()

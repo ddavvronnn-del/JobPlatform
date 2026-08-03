@@ -117,7 +117,7 @@ public class EmployerHandler {
         if (state == EmployerState.WAITING_FOR_CATEGORY && message.hasText()) {
             data.get(chatId).put("category", text);
             states.put(chatId, EmployerState.WAITING_FOR_SALARY);
-            return createMessage(chatId, "💰 **Taklif qilinadigan maoshni kiriting:**\n\n💡 *Misol:* `1200$` yoki `5,000,000 so'm`", getCancelKeyboard());
+            return createMessage(chatId, "💰 **Taklif qilinadigan maoshni kiriting:**\n\n💡 *Misol: `5,000,000 so'm`", getCancelKeyboard());
         }
 
         if (state == EmployerState.WAITING_FOR_SALARY && message.hasText()) {
