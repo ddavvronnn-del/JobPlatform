@@ -12,12 +12,9 @@ import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-import uz.imaan.jobplatform.jobseeker.dto.ApplyJobRequest;
-import uz.imaan.jobplatform.jobseeker.dto.JobApplicationDto;
-import uz.imaan.jobplatform.jobseeker.dto.JobSeekerProfileDto;
-import uz.imaan.jobplatform.jobseeker.dto.UpdateProfileRequest;
+import uz.imaan.jobplatform.jobseeker.dto.*;
 import uz.imaan.jobplatform.jobseeker.entity.JobApplication;
-import uz.imaan.jobplatform.jobseeker.service.JobSeekerService;
+import uz.imaan.jobplatform.jobseeker.service.interfaces.JobSeekerService;
 
 import java.util.List;
 
@@ -29,6 +26,10 @@ import java.util.List;
 public class JobSeekerController {
 
     private final JobSeekerService jobSeekerService;
+
+    // ============================================
+    // 1. PROFIL ENDPOINTS
+    // ============================================
 
     @Operation(summary = "Ish izlovchi profilini olish",
             description = "Foydalanuvchi ID si bo'yicha profil ma'lumotlarini qaytaradi.")
@@ -59,6 +60,91 @@ public class JobSeekerController {
         JobSeekerProfileDto updatedProfile = jobSeekerService.updateProfile(userId, request);
         return ResponseEntity.ok(updatedProfile);
     }
+
+    // ============================================
+    // 2. RESUME ENDPOINTS (YANGI QO'SHILDI)
+    // ============================================
+
+    @Operation(summary = "Yangi rezyume yaratish",
+            description = "Ish izlovchi o'z rezyumesini yaratadi.")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "201", description = "Rezyume muvaffaqiyatli yaratildi"),
+            @ApiResponse(responseCode = "400", description = "Xato ma'lumot yuborildi")
+    })
+    @PostMapping("/resume")
+    public ResponseEntity<ResumeDto> createResume(
+            @RequestHeader("X-User-Id") Long userId,
+            @Valid @RequestBody CreateResumeRequest request) {
+        log.info("POST /api/v1/job-seeker/resume - userId: {}", userId);
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(jobSeekerService.createResume(userId, request));
+    }
+
+    @Operation(summary = "Rezyumeni yangilash",
+            description = "Mavjud rezyume ma'lumotlarini yangilaydi.")
+    @PutMapping("/resume/{resumeId}")
+    public ResponseEntity<ResumeDto> updateResume(
+            @RequestHeader("X-User-Id") Long userId,
+            @PathVariable Long resumeId,
+            @Valid @RequestBody UpdateResumeRequest request) {
+        log.info("PUT /api/v1/job-seeker/resume/{} - userId: {}", resumeId, userId);
+        return ResponseEntity.ok(jobSeekerService.updateResume(userId, resumeId, request));
+    }
+
+    @Operation(summary = "Rezyumeni o'chirish",
+            description = "Rezyume ID si bo'yicha rezyumeni o'chiradi.")
+    @DeleteMapping("/resume/{resumeId}")
+    public ResponseEntity<Void> deleteResume(
+            @RequestHeader("X-User-Id") Long userId,
+            @PathVariable Long resumeId) {
+        log.info("DELETE /api/v1/job-seeker/resume/{} - userId: {}", resumeId, userId);
+        jobSeekerService.deleteResume(userId, resumeId);
+        return ResponseEntity.noContent().build();
+    }
+
+    @Operation(summary = "Rezyumeni aktiv qilish",
+            description = "Tanlangan rezyumeni aktiv holatga o'tkazadi.")
+    @PatchMapping("/resume/{resumeId}/activate")
+    public ResponseEntity<Void> setActiveResume(
+            @RequestHeader("X-User-Id") Long userId,
+            @PathVariable Long resumeId) {
+        log.info("PATCH /api/v1/job-seeker/resume/{}/activate - userId: {}", resumeId, userId);
+        jobSeekerService.setActiveResume(userId, resumeId);
+        return ResponseEntity.ok().build();
+    }
+
+    @Operation(summary = "Barcha rezyumelar ro'yxati",
+            description = "Foydalanuvchining barcha rezyumelarini qaytaradi.")
+    @GetMapping("/resume")
+    public ResponseEntity<List<ResumeDto>> getMyResumes(
+            @RequestHeader("X-User-Id") Long userId) {
+        log.info("GET /api/v1/job-seeker/resume - userId: {}", userId);
+        return ResponseEntity.ok(jobSeekerService.getMyResumes(userId));
+    }
+
+    @Operation(summary = "Aktiv rezyumeni olish",
+            description = "Foydalanuvchining aktiv rezyumesini qaytaradi.")
+    @GetMapping("/resume/active")
+    public ResponseEntity<ResumeDto> getActiveResume(
+            @RequestHeader("X-User-Id") Long userId) {
+        log.info("GET /api/v1/job-seeker/resume/active - userId: {}", userId);
+        ResumeDto resume = jobSeekerService.getActiveResume(userId);
+        return resume != null ? ResponseEntity.ok(resume) : ResponseEntity.noContent().build();
+    }
+
+    @Operation(summary = "Rezyume ID bo'yicha olish",
+            description = "Rezyume ID si bo'yicha rezyume ma'lumotlarini qaytaradi.")
+    @GetMapping("/resume/{resumeId}")
+    public ResponseEntity<ResumeDto> getResumeById(
+            @RequestHeader("X-User-Id") Long userId,
+            @PathVariable Long resumeId) {
+        log.info("GET /api/v1/job-seeker/resume/{} - userId: {}", resumeId, userId);
+        return ResponseEntity.ok(jobSeekerService.getResumeById(userId, resumeId));
+    }
+
+    // ============================================
+    // 3. JOB APPLICATION ENDPOINTS (MAVJUD)
+    // ============================================
 
     @Operation(summary = "Vakansiyaga ariza topshirish",
             description = "Tanlangan ish o'rniga ariza (application) yuboradi.")
@@ -124,4 +210,18 @@ public class JobSeekerController {
         return ResponseEntity.noContent().build();
     }
 
+    // ============================================
+    // 4. SETTINGS ENDPOINTS (YANGI QO'SHILDI)
+    // ============================================
+
+    @Operation(summary = "Sozlamalarni yangilash",
+            description = "Foydalanuvchi sozlamalarini yangilaydi.")
+    @PatchMapping("/settings")
+    public ResponseEntity<Void> updateSettings(
+            @RequestHeader("X-User-Id") Long userId,
+            @RequestBody SettingsUpdateRequest request) {
+        log.info("PATCH /api/v1/job-seeker/settings - userId: {}", userId);
+        jobSeekerService.updateSettings(userId, request);
+        return ResponseEntity.ok().build();
+    }
 }

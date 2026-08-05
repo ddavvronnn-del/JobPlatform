@@ -46,17 +46,26 @@ public class JobSeekerProfile {
     @Column(name = "wallet_balance", precision = 19, scale = 2)
     private BigDecimal walletBalance;
 
-    // --- ADMIN UCHUN BLOCK/UNBLOCK FIELDLARI ---
+    // ============================================
+    // ✅ YANGI FIELD'LAR
+    // ============================================
+    @Column(name = "experience", length = 1000)
+    private String experience;
+
+    @Column(name = "preferred_job_type")
+    private String preferredJobType;
+
+    // ============================================
+    // ADMIN UCHUN
+    // ============================================
     @Builder.Default
     @Column(name = "is_active")
     private Boolean isActive = true;
 
     @Column(name = "block_reason")
     private String blockReason;
-    // --------------------------------------------
 
     @OneToMany(mappedBy = "jobSeeker", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default
     private List<BankCard> bankCards = new ArrayList<>();
-
 }

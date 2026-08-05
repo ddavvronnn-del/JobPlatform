@@ -18,7 +18,7 @@ import uz.imaan.jobplatform.jobseeker.entity.JobApplication;
 import uz.imaan.jobplatform.jobseeker.entity.JobSeekerProfile;
 import uz.imaan.jobplatform.jobseeker.repository.JobApplicationRepository;
 import uz.imaan.jobplatform.jobseeker.repository.JobSeekerProfileRepository;
-import uz.imaan.jobplatform.jobseeker.service.WalletService;
+import uz.imaan.jobplatform.jobseeker.service.interfaces.WalletService;
 
 import java.time.LocalDate;
 
@@ -26,6 +26,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
+
 
 
 @Slf4j
@@ -40,6 +41,8 @@ public class JobSeekerHandler {
         WAITING_FOR_NAME,
         WAITING_FOR_PASSPORT,
         WAITING_FOR_PHONE,
+        WAITING_FOR_EXPERIENCE,      // Yangi: Ish tajribasi
+        WAITING_FOR_JOB_TYPE,        // Yangi: Ish turi
         MAIN_MENU,
         JOB_SEARCH,
         VIEW_JOB_DETAILS,
@@ -96,7 +99,7 @@ public class JobSeekerHandler {
         JobSeekerState state = states.getOrDefault(chatId, JobSeekerState.NONE);
 
         // ============================================
-        // 1. NAVIGATION / BACK COMMANDS
+        // 1. NAVIGATION
         // ============================================
         if (text.equals("⬅️ Orqaga") || text.equals("❌ Bekor qilish") || text.equals("Asosiy menyu")) {
             states.put(chatId, JobSeekerState.MAIN_MENU);
@@ -104,20 +107,14 @@ public class JobSeekerHandler {
         }
 
         // ============================================
-        // 2. KARTA QO'SHISH HOLATLARI (YANGI)
+        // 2. KARTA QO'SHISH HOLATLARI
         // ============================================
-
-        // 2.1 KARTA RAQAMI
         if (state == JobSeekerState.WAITING_FOR_CARD_NUMBER) {
             return handleCardNumber(chatId, text);
         }
-
-        // 2.2 KARTA MUDDATI
         if (state == JobSeekerState.WAITING_FOR_CARD_EXPIRY) {
             return handleCardExpiry(chatId, text);
         }
-
-        // 2.3 KARTA EGASI
         if (state == JobSeekerState.WAITING_FOR_CARD_HOLDER) {
             return handleCardHolder(chatId, text, profileOpt);
         }
@@ -131,8 +128,7 @@ public class JobSeekerHandler {
                 return createMessage(chatId, "🛠 **Ishchi menyusi**\n\nKerakli bo'limni tanlang:", getMainMenuKeyboard());
             } else {
                 states.put(chatId, JobSeekerState.WAITING_FOR_NAME);
-                return createMessage(chatId, "👤 **Ish izlovchi sifatida ro'yxatdan o'tish:**" +
-                        "\n\nIltimos, ism va familiyangizni kiriting.\n💡 *Misol:* `Ali Valiyev`", null);
+                return createMessage(chatId, "👤 **Ish izlovchi sifatida ro'yxatdan o'tish:**\n\nIltimos, ism va familiyangizni kiriting.\n💡 *Misol:* `Ali Valiyev`", null);
             }
         }
 
@@ -140,8 +136,7 @@ public class JobSeekerHandler {
         if (state == JobSeekerState.WAITING_FOR_NAME && message.hasText()) {
             data.get(chatId).put("fullName", text);
             states.put(chatId, JobSeekerState.WAITING_FOR_PASSPORT);
-            return createMessage(chatId, "🪪 **Pasport seriya va raqamingizni kiriting:**" +
-                    "\n\n💡 *Misol:* `AA1234567`", null);
+            return createMessage(chatId, "🪪 **Pasport seriya va raqamingizni kiriting:**\n\n💡 *Misol:* `AA1234567`", null);
         }
 
         // Step 2: Pasport
@@ -155,22 +150,73 @@ public class JobSeekerHandler {
         if (state == JobSeekerState.WAITING_FOR_PHONE) {
             String phone = message.hasContact() ? message.getContact().getPhoneNumber() : text;
             if (!phone.isEmpty()) {
-                JobSeekerProfile profile = profileOpt.orElse(new JobSeekerProfile());
-                profile.setUserId(chatId);
-                profile.setFullName(data.get(chatId).get("fullName"));
-                profile.setPassportNumber(data.get(chatId).get("passport"));
-                profile.setPhoneNumber(phone);
-                jobSeekerProfileRepository.save(profile);
+                data.get(chatId).put("phone", phone);
 
-                states.put(chatId, JobSeekerState.MAIN_MENU);
-                data.remove(chatId);
-                return createMessage(chatId, "✅ **Muvaffaqiyatli ro'yxatdan o'tdingiz!**" +
-                        "\n\nIshchi menyusi:", getMainMenuKeyboard());
+                // Telefon saqlandi, endi tajriba so'raymiz
+                states.put(chatId, JobSeekerState.WAITING_FOR_EXPERIENCE);
+                return createMessage(chatId, "📝 **Ish tajribangiz haqida ma'lumot bering:**\n\n" +
+                        "Qancha vaqtdan beri ishlayapsiz? Qanday sohalarda tajribangiz bor?\n" +
+                        "💡 *Misol:* `3 yil Java dasturchi, 1 yil Python`", null);
             }
         }
 
         // ============================================
-        // 4. KASBNI SAQLASH
+        // 4. ISH TAJRIBASI (YANGI)
+        // ============================================
+        if (state == JobSeekerState.WAITING_FOR_EXPERIENCE && message.hasText()) {
+            data.get(chatId).put("experience", text);
+
+            // Tajriba saqlandi, endi ish turi so'raymiz
+            states.put(chatId, JobSeekerState.WAITING_FOR_JOB_TYPE);
+            return createMessage(chatId, "🛠 **Qanday turdagi ish qidiryapsiz?**\n\n" +
+                    "Iltimos, quyidagi tugmalardan birini tanlang:", getJobTypeKeyboard());
+        }
+
+        // ============================================
+        // 5. ISH TURI (YANGI)
+        // ============================================
+
+        if (state == JobSeekerState.WAITING_FOR_JOB_TYPE && message.hasText()) {
+            String jobType = text;
+
+            // 1. Ma'lumotlarni vaqtinchalik saqlash
+            data.get(chatId).put("jobType", jobType);
+
+            // 2. Profil yaratish
+            JobSeekerProfile profile = new JobSeekerProfile();
+            profile.setUserId(chatId);
+            profile.setFullName(data.get(chatId).get("fullName"));
+            profile.setPassportNumber(data.get(chatId).get("passport"));
+            profile.setPhoneNumber(data.get(chatId).get("phone"));
+            profile.setExperience(data.get(chatId).get("experience"));
+            profile.setPreferredJobType(jobType);
+
+            // 3. Bazaga saqlash
+            jobSeekerProfileRepository.save(profile);
+
+            // 4. Holatni o'zgartirish
+            states.put(chatId, JobSeekerState.MAIN_MENU);
+
+            // 5. Xabar tayyorlash
+            String jobTypeEmoji = getJobTypeEmoji(jobType);
+            String messageText = String.format(
+                    "✅ **Muvaffaqiyatli ro'yxatdan o'tdingiz!**\n\n" +
+                            "📝 **Tajribangiz:** %s\n" +
+                            "🛠 **Ish turi:** %s %s\n\n" +
+                            "Endi ishchi menyusidan foydalanishingiz mumkin!",
+                    data.get(chatId).get("experience"),
+                    jobTypeEmoji,
+                    jobType
+            );
+
+            // 6. Vaqtinchalik ma'lumotlarni tozalash
+            data.remove(chatId);
+
+            // 7. Xabarni yuborish
+            return createMessage(chatId, messageText, getMainMenuKeyboard());
+        }
+        // ============================================
+        // 6. KASBNI SAQLASH
         // ============================================
         if (state == JobSeekerState.WAITING_FOR_PROFESSION && message.hasText()) {
             JobSeekerProfile profile = profileOpt.orElseGet(() -> {
@@ -182,12 +228,11 @@ public class JobSeekerHandler {
             jobSeekerProfileRepository.save(profile);
 
             states.put(chatId, JobSeekerState.PROFILE_MENU);
-            return createMessage(chatId, "✅ **Kasbingiz muvaffaqiyatli saqlandi!**" +
-                    "\n\n💼 Yangi kasb: `" + text + "`", getProfileKeyboard());
+            return createMessage(chatId, "✅ **Kasbingiz muvaffaqiyatli saqlandi!**\n\n💼 Yangi kasb: `" + text + "`", getProfileKeyboard());
         }
 
         // ============================================
-        // 5. ISMNI TAHRIRLASH
+        // 7. ISMNI TAHRIRLASH
         // ============================================
         if (state == JobSeekerState.WAITING_FOR_EDIT_NAME && message.hasText()) {
             JobSeekerProfile profile = profileOpt.orElseGet(() -> {
@@ -199,12 +244,11 @@ public class JobSeekerHandler {
             jobSeekerProfileRepository.save(profile);
 
             states.put(chatId, JobSeekerState.PROFILE_MENU);
-            return createMessage(chatId, "✅ **Ism-familiyangiz muvaffaqiyatli yangilandi!**" +
-                    "\n\n👤 Yangi F.I.O: `" + text + "`", getProfileKeyboard());
+            return createMessage(chatId, "✅ **Ism-familiyangiz muvaffaqiyatli yangilandi!**\n\n👤 Yangi F.I.O: `" + text + "`", getProfileKeyboard());
         }
 
         // ============================================
-        // 6. COVER LETTER (Ariza izohi)
+        // 8. COVER LETTER
         // ============================================
         if (state == JobSeekerState.APPLY_COMMENT && message.hasText()) {
             String coverLetterText = text;
@@ -235,11 +279,15 @@ public class JobSeekerHandler {
                                     "👤 **Nomzod:** %s\n" +
                                     "🪪 **Pasport:** %s\n" +
                                     "📞 **Tel:** %s\n" +
+                                    "📝 **Tajriba:** %s\n" +
+                                    "🛠 **Ish turi:** %s\n" +
                                     "✍️ **Izoh:** %s",
                             selectedJob.getTitle(),
                             profile.getFullName() != null ? profile.getFullName() : "Kiritilmagan",
                             profile.getPassportNumber() != null ? profile.getPassportNumber() : "Kiritilmagan",
                             profile.getPhoneNumber() != null ? profile.getPhoneNumber() : "Kiritilmagan",
+                            profile.getExperience() != null ? profile.getExperience() : "Kiritilmagan",
+                            profile.getPreferredJobType() != null ? profile.getPreferredJobType() : "Kiritilmagan",
                             coverLetterText
                     );
 
@@ -255,12 +303,11 @@ public class JobSeekerHandler {
             }
 
             states.put(chatId, JobSeekerState.MAIN_MENU);
-            return createMessage(chatId, "✅ **Ariza yuborildi✓**" +
-                    "\n\nArizangiz ish beruvchiga ko'rib chiqish uchun muvaffaqiyatli yetkazildi!", getMainMenuKeyboard());
+            return createMessage(chatId, "✅ **Ariza yuborildi✓**\n\nArizangiz ish beruvchiga ko'rib chiqish uchun muvaffaqiyatli yetkazildi!", getMainMenuKeyboard());
         }
 
         // ============================================
-        // 7. MAIN MENU
+        // 9. MAIN MENU
         // ============================================
         switch (text) {
             case "🔍 Ish qidirish":
@@ -273,22 +320,7 @@ public class JobSeekerHandler {
 
             case "👤 Profilim":
                 states.put(chatId, JobSeekerState.PROFILE_MENU);
-                JobSeekerProfile profile = profileOpt.orElse(new JobSeekerProfile());
-                double rating = profile.getRating() != null ? profile.getRating() : 0.0;
-                String info = String.format(
-                        "👤 **Profil ma'lumotlari:**\n\n" +
-                                "📌 **F.I.O:** %s\n" +
-                                "🪪 **Pasport:** %s\n" +
-                                "📞 **Tel:** %s\n" +
-                                "⭐ **Reyting:** %.1f\n" +
-                                "💼 **Kasb:** %s",
-                        profile.getFullName() != null ? profile.getFullName() : "Kiritilmagan",
-                        profile.getPassportNumber() != null ? profile.getPassportNumber() : "Kiritilmagan",
-                        profile.getPhoneNumber() != null ? profile.getPhoneNumber() : "Kiritilmagan",
-                        rating,
-                        profile.getProfession() != null ? profile.getProfession() : "Ko'rsatilmagan"
-                );
-                return createMessage(chatId, info, getProfileKeyboard());
+                return showProfile(chatId, profileOpt);
 
             case "📂 Arizalar":
             case "📁 Arizalar":
@@ -305,7 +337,7 @@ public class JobSeekerHandler {
         }
 
         // ============================================
-        // 8. ISH QIDIRISH
+        // 10. ISH QIDIRISH
         // ============================================
         if (state == JobSeekerState.JOB_SEARCH) {
             List<JobVacancy> vacancies;
@@ -346,7 +378,7 @@ public class JobSeekerHandler {
         }
 
         // ============================================
-        // 9. VAKANSIYA TANLANGANDA
+        // 11. VAKANSIYA TANLANGANDA
         // ============================================
         if (state == JobSeekerState.VIEW_JOB_DETAILS) {
             if (text.startsWith("📌 [")) {
@@ -379,109 +411,33 @@ public class JobSeekerHandler {
 
             if (text.equals("📝 Ariza berish")) {
                 states.put(chatId, JobSeekerState.APPLY_COMMENT);
-                return createMessage(chatId, "✍️ **Cover letter (Izoh) yozing:**" +
-                        "\n\nO'zingiz va tajribangiz haqida qisqacha ma'lumot qoldiring:", getCancelKeyboard());
+                return createMessage(chatId, "✍️ **Cover letter (Izoh) yozing:**\n\nO'zingiz va tajribangiz haqida qisqacha ma'lumot qoldiring:", getCancelKeyboard());
             }
         }
 
         // ============================================
-        // 10. PROFIL MENYUSI
+        // 12. PROFIL MENYUSI
         // ============================================
         if (state == JobSeekerState.PROFILE_MENU) {
-            JobSeekerProfile profile = profileOpt.orElse(new JobSeekerProfile());
-            double r = profile.getRating() != null ? profile.getRating() : 0.0;
-
-            if (text.contains("Ma'lumotlar")) {
-                String profileInfo = String.format(
-                        "👤 **Profil ma'lumotlari:**\n\n" +
-                                "📌 **F.I.O:** %s\n" +
-                                "🪪 **Pasport:** %s\n" +
-                                "📞 **Tel:** %s\n" +
-                                "⭐ **Reyting:** %.1f\n" +
-                                "💼 **Kasb:** %s",
-                        profile.getFullName() != null ? profile.getFullName() : "Kiritilmagan",
-                        profile.getPassportNumber() != null ? profile.getPassportNumber() : "Kiritilmagan",
-                        profile.getPhoneNumber() != null ? profile.getPhoneNumber() : "Kiritilmagan",
-                        r,
-                        profile.getProfession() != null ? profile.getProfession() : "Ko'rsatilmagan"
-                );
-                return createMessage(chatId, profileInfo, getProfileKeyboard());
-            }
-
-            if (text.contains("Portfolio")) {
-                return createMessage(chatId, "📁 **Portfolio bo'limi:**" +
-                        "\n\nHozircha portfolio yuklanmagan. Loyihalaringiz havolasini (link) yuborishingiz mumkin:", getSubBackKeyboard());
-            }
-
-            if (text.contains("Reyting")) {
-                return createMessage(chatId, String.format("⭐ **Sizning joriy reytingingiz:** %.1f / 5.0" +
-                        "\n\nBajarilgan ishlar va ish beruvchilar bahosi asosida shakllanadi.", r), getProfileKeyboard());
-            }
-
-            if (text.contains("Rasm")) {
-                return createMessage(chatId, "🖼 **Profil rasmi:**" +
-                        "\n\nProfil rasmingizni yangilash uchun botga rasm yuboring:", getSubBackKeyboard());
-            }
-
-            if (text.contains("Kasb")) {
-                states.put(chatId, JobSeekerState.WAITING_FOR_PROFESSION);
-                String profession = profile.getProfession() != null ? profile.getProfession() : "Ko'rsatilmagan";
-                return createMessage(chatId, String.format("💼 **Joriy kasbingiz:** %s" +
-                        "\n\nKasbingizni o'zgartirish uchun yangi kasb nomini kiriting (Masalan: Java Developer):",
-                        profession), getSubBackKeyboard());
-            }
-
-            if (text.contains("Tahrirlash")) {
-                states.put(chatId, JobSeekerState.WAITING_FOR_EDIT_NAME);
-                return createMessage(chatId, "✏️ **Profilni tahrirlash:**" +
-                        "\n\nYangi ism va familiyangizni kiriting:", getSubBackKeyboard());
-            }
+            return handleProfileMenu(chatId, text, profileOpt);
         }
 
         // ============================================
-        // 11. HAMYON MENYUSI
+        // 13. HAMYON MENYUSI
         // ============================================
         if (state == JobSeekerState.WALLET_MENU) {
-            if (text.contains("Bank kartasi qo'shish") || text.contains("💳 Bank kartasi")) {
-                states.put(chatId, JobSeekerState.WAITING_FOR_CARD_NUMBER);
-                return createMessage(chatId, "💳 Karta raqamingizni kiriting (16 xona):", getCancelKeyboard());
-            }
-            if (text.contains("Hisob balansi") || text.contains("💰 Hisob balansi")) {
-                return showWallet(chatId);
-            }
-            if (text.contains("Pul yechish")) {
-                return createMessage(chatId, "⚠️ Pul yechish uchun minimal summa: 50,000 so'm.", getWalletKeyboard());
-            }
-            if (text.contains("To'lov usullari")) {
-                return createMessage(chatId, "💳 **Mavjud to'lov usullari:**\n\n- Click\n- Payme\n- Uzum Bank", getWalletKeyboard());
-            }
-            if (text.contains("To'lov tarixi")) {
-                return createMessage(chatId, "📜 **To'lovlar tarixi:**\n\nHozircha amaliyotlar mavjud emas.", getWalletKeyboard());
-            }
+            return handleWalletMenu(chatId, text);
         }
 
         // ============================================
-        // 12. SOZLAMALAR MENYUSI
+        // 14. SOZLAMALAR MENYUSI
         // ============================================
         if (state == JobSeekerState.SETTINGS_MENU) {
-            if (text.contains("Til")) {
-                return createMessage(chatId, "🌐 **Tilni tanlang:**\n\n🇺🇿 O'zbek tili (Aktiv)", getSettingsKeyboard());
-            }
-            if (text.contains("Maxfiylik")) {
-                return createMessage(chatId, "🔒 **Maxfiylik sozlamalari:**" +
-                        "\n\nSizning ma'lumotlaringiz xavfsiz saqlanadi.", getSettingsKeyboard());
-            }
-            if (text.contains("Bildirishnoma")) {
-                return createMessage(chatId, "🔔 **Bildirishnomalar:** Yoniq ✅", getSettingsKeyboard());
-            }
-            if (text.contains("Yordam")) {
-                return createMessage(chatId, "❓ **Yordam markazi:**" +
-                        "\n\nMuammo yuzaga kelsa, admin bilan bog'laning.", getSettingsKeyboard());
-            }
+            return handleSettingsMenu(chatId, text);
         }
 
         // ============================================
-        // 13. FAOL ISHLAR
+        // 15. FAOL ISHLAR
         // ============================================
         if (state == JobSeekerState.ACTIVE_JOBS) {
             if (text.contains("Joriy ishlar") || text.contains("Topshiriqlar") || text.contains("Vazifalar")) {
@@ -493,34 +449,120 @@ public class JobSeekerHandler {
     }
 
     // ============================================
-    // KARTA QO'SHISH METODLARI (YANGI)
+    // PROFIL MENYUSI
     // ============================================
+    private SendMessage handleProfileMenu(Long chatId, String text, Optional<JobSeekerProfile> profileOpt) {
+        JobSeekerProfile profile = profileOpt.orElse(new JobSeekerProfile());
+        double rating = profile.getRating() != null ? profile.getRating() : 0.0;
 
-    // 1. KARTA RAQAMI
-    private SendMessage handleCardNumber(Long chatId, String text) {
-        // 1. 16 ta raqamdan iboratligini tekshirish
-        if (!text.matches("\\d{16}")) {
-            return createMessage(chatId, "❌ Karta raqami 16 ta raqamdan iborat bo'lishi kerak!\nQaytadan kiriting:",
-                    getCancelKeyboard());
+        if (text.contains("Ma'lumotlar")) {
+            String profileInfo = String.format(
+                    "👤 **Profil ma'lumotlari:**\n\n" +
+                            "📌 **F.I.O:** %s\n" +
+                            "🪪 **Pasport:** %s\n" +
+                            "📞 **Tel:** %s\n" +
+                            "⭐ **Reyting:** %.1f\n" +
+                            "💼 **Kasb:** %s\n" +
+                            "📝 **Tajriba:** %s\n" +
+                            "🛠 **Ish turi:** %s",
+                    profile.getFullName() != null ? profile.getFullName() : "Kiritilmagan",
+                    profile.getPassportNumber() != null ? profile.getPassportNumber() : "Kiritilmagan",
+                    profile.getPhoneNumber() != null ? profile.getPhoneNumber() : "Kiritilmagan",
+                    rating,
+                    profile.getProfession() != null ? profile.getProfession() : "Ko'rsatilmagan",
+                    profile.getExperience() != null ? profile.getExperience() : "Ko'rsatilmagan",
+                    profile.getPreferredJobType() != null ? profile.getPreferredJobType() : "Ko'rsatilmagan"
+            );
+            return createMessage(chatId, profileInfo, getProfileKeyboard());
         }
 
-        // 2. Karta raqamini saqlash
+        if (text.contains("Portfolio")) {
+            return createMessage(chatId, "📁 **Portfolio bo'limi:**\n\nHozircha portfolio yuklanmagan. Loyihalaringiz havolasini (link) yuborishingiz mumkin:", getSubBackKeyboard());
+        }
+
+        if (text.contains("Reyting")) {
+            return createMessage(chatId, String.format("⭐ **Sizning joriy reytingingiz:** %.1f / 5.0\n\nBajarilgan ishlar va ish beruvchilar bahosi asosida shakllanadi.", rating), getProfileKeyboard());
+        }
+
+        if (text.contains("Rasm")) {
+            return createMessage(chatId, "🖼 **Profil rasmi:**\n\nProfil rasmingizni yangilash uchun botga rasm yuboring:", getSubBackKeyboard());
+        }
+
+        if (text.contains("Kasb")) {
+            states.put(chatId, JobSeekerState.WAITING_FOR_PROFESSION);
+            String profession = profile.getProfession() != null ? profile.getProfession() : "Ko'rsatilmagan";
+            return createMessage(chatId, String.format("💼 **Joriy kasbingiz:** %s\n\nKasbingizni o'zgartirish uchun yangi kasb nomini kiriting (Masalan: Java Developer):", profession), getSubBackKeyboard());
+        }
+
+        if (text.contains("Tahrirlash")) {
+            states.put(chatId, JobSeekerState.WAITING_FOR_EDIT_NAME);
+            return createMessage(chatId, "✏️ **Profilni tahrirlash:**\n\nYangi ism va familiyangizni kiriting:", getSubBackKeyboard());
+        }
+
+        return createMessage(chatId, "👤 **Profil menyusi**", getProfileKeyboard());
+    }
+
+    // ============================================
+    // HAMYON MENYUSI
+    // ============================================
+    private SendMessage handleWalletMenu(Long chatId, String text) {
+        if (text.contains("Bank kartasi qo'shish") || text.contains("💳 Bank kartasi")) {
+            states.put(chatId, JobSeekerState.WAITING_FOR_CARD_NUMBER);
+            return createMessage(chatId, "💳 Karta raqamingizni kiriting (16 xona):", getCancelKeyboard());
+        }
+        if (text.contains("Hisob balansi") || text.contains("💰 Hisob balansi")) {
+            return showWallet(chatId);
+        }
+        if (text.contains("Pul yechish")) {
+            return createMessage(chatId, "⚠️ Pul yechish uchun minimal summa: 50,000 so'm.", getWalletKeyboard());
+        }
+        if (text.contains("To'lov usullari")) {
+            return createMessage(chatId, "💳 **Mavjud to'lov usullari:**\n\n- Click\n- Payme\n- Uzum Bank", getWalletKeyboard());
+        }
+        if (text.contains("To'lov tarixi")) {
+            return createMessage(chatId, "📜 **To'lovlar tarixi:**\n\nHozircha amaliyotlar mavjud emas.", getWalletKeyboard());
+        }
+        return null;
+    }
+
+    // ============================================
+    // SOZLAMALAR MENYUSI
+    // ============================================
+    private SendMessage handleSettingsMenu(Long chatId, String text) {
+        if (text.contains("Til")) {
+            return createMessage(chatId, "🌐 **Tilni tanlang:**\n\n🇺🇿 O'zbek tili (Aktiv)", getSettingsKeyboard());
+        }
+        if (text.contains("Maxfiylik")) {
+            return createMessage(chatId, "🔒 **Maxfiylik sozlamalari:**\n\nSizning ma'lumotlaringiz xavfsiz saqlanadi.", getSettingsKeyboard());
+        }
+        if (text.contains("Bildirishnoma")) {
+            return createMessage(chatId, "🔔 **Bildirishnomalar:** Yoniq ✅", getSettingsKeyboard());
+        }
+        if (text.contains("Yordam")) {
+            return createMessage(chatId, "❓ **Yordam markazi:**\n\nMuammo yuzaga kelsa, admin bilan bog'laning.", getSettingsKeyboard());
+        }
+        return null;
+    }
+
+    // ============================================
+    // KARTA QO'SHISH METODLARI
+    // ============================================
+
+    private SendMessage handleCardNumber(Long chatId, String text) {
+        if (!text.matches("\\d{16}")) {
+            return createMessage(chatId, "❌ Karta raqami 16 ta raqamdan iborat bo'lishi kerak!\nQaytadan kiriting:", getCancelKeyboard());
+        }
         data.get(chatId).put("cardNumber", text);
         log.info("✅ Karta raqami qabul qilindi: {}", text);
-
-        // 3. KEYINGI QADAM: MUDDAT SO'RASH
         states.put(chatId, JobSeekerState.WAITING_FOR_CARD_EXPIRY);
         return createMessage(chatId, "📅 Karta amal qilish muddatini kiriting (MM/YY):\nMasalan: 12/26", getCancelKeyboard());
     }
 
-    // 2. KARTA MUDDATI
     private SendMessage handleCardExpiry(Long chatId, String text) {
-        // 1. Formatni tekshirish (MM/YY)
         if (!text.matches("^(0[1-9]|1[0-2])/([0-9]{2})$")) {
             return createMessage(chatId, "❌ Noto'g'ri format! Format: MM/YY\nMasalan: 12/26", getCancelKeyboard());
         }
 
-        // 2. Muddat o'tmaganligini tekshirish
         String[] parts = text.split("/");
         int month = Integer.parseInt(parts[0]);
         int year = Integer.parseInt(parts[1]) + 2000;
@@ -530,31 +572,22 @@ public class JobSeekerHandler {
             return createMessage(chatId, "❌ Karta muddati o'tgan! Boshqa kartani kiriting:", getCancelKeyboard());
         }
 
-        // 3. Karta muddatini saqlash
         data.get(chatId).put("cardExpiry", text);
         log.info("✅ Karta muddati qabul qilindi: {}", text);
-
-        // 4. KEYINGI QADAM: KARTA EGASI SO'RASH
         states.put(chatId, JobSeekerState.WAITING_FOR_CARD_HOLDER);
         return createMessage(chatId, "👤 Karta egasi ismini kiriting:\nMasalan: ALI VALIYEV", getCancelKeyboard());
     }
 
-    // 3. KARTA EGASI
     private SendMessage handleCardHolder(Long chatId, String text, Optional<JobSeekerProfile> profileOpt) {
-        // 1. Karta egasi ismini tekshirish
         if (text.length() < 3) {
             return createMessage(chatId, "❌ Karta egasi ismi juda qisqa! Qaytadan kiriting:", getCancelKeyboard());
         }
 
-        // 2. User ID ni olish
         Long userId = chatId;
-        if (profileOpt.isPresent()) {
-            userId = profileOpt.get().getUserId();
-        } else {
+        if (profileOpt.isEmpty()) {
             return createMessage(chatId, "❌ Siz hali ro'yxatdan o'tmagansiz! Iltimos, /start bosing.", getMainMenuKeyboard());
         }
 
-        // 3. Kartani saqlash
         String cardNumber = data.get(chatId).get("cardNumber");
         String expiryDate = data.get(chatId).get("cardExpiry");
 
@@ -566,7 +599,6 @@ public class JobSeekerHandler {
 
             walletService.addBankCard(userId, request);
 
-            // Tozalash
             states.put(chatId, JobSeekerState.WALLET_MENU);
             data.get(chatId).remove("cardNumber");
             data.get(chatId).remove("cardExpiry");
@@ -588,7 +620,6 @@ public class JobSeekerHandler {
     // ============================================
     private SendMessage showWallet(Long chatId) {
         try {
-            // Balansni olish
             Optional<JobSeekerProfile> profileOpt = jobSeekerProfileRepository.findByUserId(chatId);
             if (profileOpt.isEmpty()) {
                 return createMessage(chatId, "❌ Siz hali ro'yxatdan o'tmagansiz!", getMainMenuKeyboard());
@@ -597,16 +628,45 @@ public class JobSeekerHandler {
             JobSeekerProfile profile = profileOpt.get();
             String balance = profile.getWalletBalance() != null ? profile.getWalletBalance().toString() : "0";
 
-            String message = "💳 **Hamyon va To'lovlar:**\n\n" +
+            return createMessage(chatId, "💳 **Hamyon va To'lovlar:**\n\n" +
                     "💰 **Hisob balansi:** " + balance + " so'm\n\n" +
-                    "📌 Quyidagi tugmalardan foydalaning:";
-
-            return createMessage(chatId, message, getWalletKeyboard());
+                    "📌 Quyidagi tugmalardan foydalaning:", getWalletKeyboard());
 
         } catch (Exception e) {
             log.error("❌ Hamyonni ko'rsatishda xatolik: {}", e.getMessage());
             return createMessage(chatId, "❌ Xatolik yuz berdi!", getMainMenuKeyboard());
         }
+    }
+
+    // ============================================
+    // PROFIL
+    // ============================================
+    private SendMessage showProfile(Long chatId, Optional<JobSeekerProfile> profileOpt) {
+        if (profileOpt.isEmpty()) {
+            return createMessage(chatId, "❌ Siz hali ro'yxatdan o'tmagansiz!", getMainMenuKeyboard());
+        }
+
+        JobSeekerProfile profile = profileOpt.get();
+        double rating = profile.getRating() != null ? profile.getRating() : 0.0;
+
+        String info = String.format(
+                "👤 **Profil ma'lumotlari:**\n\n" +
+                        "📌 **F.I.O:** %s\n" +
+                        "🪪 **Pasport:** %s\n" +
+                        "📞 **Tel:** %s\n" +
+                        "⭐ **Reyting:** %.1f\n" +
+                        "💼 **Kasb:** %s\n" +
+                        "📝 **Tajriba:** %s\n" +
+                        "🛠 **Ish turi:** %s",
+                profile.getFullName() != null ? profile.getFullName() : "Kiritilmagan",
+                profile.getPassportNumber() != null ? profile.getPassportNumber() : "Kiritilmagan",
+                profile.getPhoneNumber() != null ? profile.getPhoneNumber() : "Kiritilmagan",
+                rating,
+                profile.getProfession() != null ? profile.getProfession() : "Ko'rsatilmagan",
+                profile.getExperience() != null ? profile.getExperience() : "Ko'rsatilmagan",
+                profile.getPreferredJobType() != null ? profile.getPreferredJobType() : "Ko'rsatilmagan"
+        );
+        return createMessage(chatId, info, getProfileKeyboard());
     }
 
     // ============================================
@@ -621,8 +681,7 @@ public class JobSeekerHandler {
         List<JobApplication> myApps = jobApplicationRepository.findByJobSeekerId(jobSeekerId);
 
         if (myApps == null || myApps.isEmpty()) {
-            return createMessage(chatId, "📂 Siz hali hech qanday vakansiyaga ariza topshirmagansiz.",
-                    getSubBackKeyboard());
+            return createMessage(chatId, "📂 Siz hali hech qanday vakansiyaga ariza topshirmagansiz.", getSubBackKeyboard());
         }
 
         StringBuilder sb = new StringBuilder("📋 **Siz yuborgan arizalar:**\n\n");
@@ -642,8 +701,7 @@ public class JobSeekerHandler {
             };
 
             sb.append("📌 **Vakansiya:** ").append(jobTitle).append("\n")
-                    .append("✍️ **Cover letter:** ").append(app.getCoverLetter() != null ?
-                            app.getCoverLetter() : "Mavjud emas").append("\n")
+                    .append("✍️ **Cover letter:** ").append(app.getCoverLetter() != null ? app.getCoverLetter() : "Mavjud emas").append("\n")
                     .append("📊 **Holat:** ").append(statusStr).append("\n")
                     .append("───────────────\n");
         }
@@ -651,9 +709,40 @@ public class JobSeekerHandler {
     }
 
     // ============================================
+    // ISH TURI EMOJI
+    // ============================================
+    private String getJobTypeEmoji(String jobType) {
+        if (jobType == null) return "🛠";
+
+        if (jobType.contains("IT") || jobType.contains("Dasturchi") || jobType.contains("Developer")) {
+            return "💻";
+        } else if (jobType.contains("Dizayn") || jobType.contains("Designer")) {
+            return "🎨";
+        } else if (jobType.contains("Og'ir") || jobType.contains("Yuk") || jobType.contains("Qurilish")) {
+            return "🏗️";
+        } else if (jobType.contains("Haydovchi") || jobType.contains("Driver")) {
+            return "🚗";
+        } else if (jobType.contains("O'qituvchi") || jobType.contains("Teacher")) {
+            return "📚";
+        } else if (jobType.contains("Sotuvchi") || jobType.contains("Seller")) {
+            return "🛒";
+        } else if (jobType.contains("Farrosh") || jobType.contains("Tozalash")) {
+            return "🧹";
+        } else if (jobType.contains("Pazanda") || jobType.contains("Oshpaz")) {
+            return "👨‍🍳";
+        } else if (jobType.contains("Qorovul") || jobType.contains("Security")) {
+            return "🔒";
+        } else if (jobType.contains("Kuryer") || jobType.contains("Yetkazib")) {
+            return "📦";
+        }
+        return "🛠";
+    }
+
+    // ============================================
     // KEYBOARDS
     // ============================================
 
+    // 1. ASOSIY MENYU
     public ReplyKeyboardMarkup getMainMenuKeyboard() {
         ReplyKeyboardMarkup markup = new ReplyKeyboardMarkup();
         markup.setResizeKeyboard(true);
@@ -677,31 +766,64 @@ public class JobSeekerHandler {
         return markup;
     }
 
-    private ReplyKeyboardMarkup getJobActionKeyboard() {
+    // 2. ISH TURI TUGMALARI (YANGI)
+    private ReplyKeyboardMarkup getJobTypeKeyboard() {
         ReplyKeyboardMarkup markup = new ReplyKeyboardMarkup();
         markup.setResizeKeyboard(true);
 
         KeyboardRow row1 = new KeyboardRow();
-        row1.add("📝 Ariza berish");
+        row1.add("💻 IT & Dasturlash");
+        row1.add("🎨 Dizayn");
 
         KeyboardRow row2 = new KeyboardRow();
-        row2.add("⬅️ Orqaga");
+        row2.add("🏗️ Og'ir yuk / Qurilish");
+        row2.add("🚗 Haydovchi / Kuryer");
 
-        markup.setKeyboard(List.of(row1, row2));
+        KeyboardRow row3 = new KeyboardRow();
+        row3.add("📚 O'qituvchi / Repetitor");
+        row3.add("🛒 Sotuvchi / Savdo");
+
+        KeyboardRow row4 = new KeyboardRow();
+        row4.add("🧹 Farrosh / Tozalash");
+        row4.add("👨‍🍳 Pazanda / Oshpaz");
+
+        KeyboardRow row5 = new KeyboardRow();
+        row5.add("🔒 Qorovul / Xavfsizlik");
+        row5.add("📦 Kuryer / Yetkazib berish");
+
+        KeyboardRow row6 = new KeyboardRow();
+        row6.add("⬅️ Orqaga");
+
+        markup.setKeyboard(List.of(row1, row2, row3, row4, row5, row6));
         return markup;
     }
 
-    private ReplyKeyboardMarkup getCancelKeyboard() {
+    // 3. ISH QIDIRISH KATEGORIYALARI
+    private ReplyKeyboardMarkup getCategoryKeyboard() {
         ReplyKeyboardMarkup markup = new ReplyKeyboardMarkup();
         markup.setResizeKeyboard(true);
 
-        KeyboardRow row = new KeyboardRow();
-        row.add("❌ Bekor qilish");
+        KeyboardRow row1 = new KeyboardRow();
+        row1.add("💻 IT & Dasturlash");
+        row1.add("🎨 Dizayn");
 
-        markup.setKeyboard(List.of(row));
+        KeyboardRow row2 = new KeyboardRow();
+        row2.add("🏗️ Qurilish");
+        row2.add("🚗 Haydovchi");
+
+        KeyboardRow row3 = new KeyboardRow();
+        row3.add("📚 Ta'lim");
+        row3.add("🛒 Savdo");
+
+        KeyboardRow row4 = new KeyboardRow();
+        row4.add("🌐 Barcha vakansiyalar");
+        row4.add("⬅️ Orqaga");
+
+        markup.setKeyboard(List.of(row1, row2, row3, row4));
         return markup;
     }
 
+    // 4. PROFIL KEYBOARD
     private ReplyKeyboardMarkup getProfileKeyboard() {
         ReplyKeyboardMarkup markup = new ReplyKeyboardMarkup();
         markup.setResizeKeyboard(true);
@@ -723,6 +845,7 @@ public class JobSeekerHandler {
         return markup;
     }
 
+    // 5. HAMYON KEYBOARD
     private ReplyKeyboardMarkup getWalletKeyboard() {
         ReplyKeyboardMarkup markup = new ReplyKeyboardMarkup();
         markup.setResizeKeyboard(true);
@@ -737,12 +860,13 @@ public class JobSeekerHandler {
 
         KeyboardRow row3 = new KeyboardRow();
         row3.add("💸 Pul yechish");
-        row3.add("⬅Orqaga");
+        row3.add("⬅️ Orqaga");
 
         markup.setKeyboard(List.of(row1, row2, row3));
         return markup;
     }
 
+    // 6. SOZLAMALAR KEYBOARD
     private ReplyKeyboardMarkup getSettingsKeyboard() {
         ReplyKeyboardMarkup markup = new ReplyKeyboardMarkup();
         markup.setResizeKeyboard(true);
@@ -762,6 +886,7 @@ public class JobSeekerHandler {
         return markup;
     }
 
+    // 7. FAOL ISHLAR KEYBOARD
     private ReplyKeyboardMarkup getActiveJobsKeyboard() {
         ReplyKeyboardMarkup markup = new ReplyKeyboardMarkup();
         markup.setResizeKeyboard(true);
@@ -778,22 +903,34 @@ public class JobSeekerHandler {
         return markup;
     }
 
-    private ReplyKeyboardMarkup getCategoryKeyboard() {
+    // 8. ARIZA BERISH KEYBOARD
+    private ReplyKeyboardMarkup getJobActionKeyboard() {
         ReplyKeyboardMarkup markup = new ReplyKeyboardMarkup();
         markup.setResizeKeyboard(true);
 
         KeyboardRow row1 = new KeyboardRow();
-        row1.add("💻 IT & Dasturlash");
-        row1.add("🎨 Dizayn");
+        row1.add("📝 Ariza berish");
 
         KeyboardRow row2 = new KeyboardRow();
-        row2.add("🌐 Barcha vakansiyalar");
         row2.add("⬅️ Orqaga");
 
         markup.setKeyboard(List.of(row1, row2));
         return markup;
     }
 
+    // 9. BEKOR QILISH KEYBOARD
+    private ReplyKeyboardMarkup getCancelKeyboard() {
+        ReplyKeyboardMarkup markup = new ReplyKeyboardMarkup();
+        markup.setResizeKeyboard(true);
+
+        KeyboardRow row = new KeyboardRow();
+        row.add("❌ Bekor qilish");
+
+        markup.setKeyboard(List.of(row));
+        return markup;
+    }
+
+    // 10. ORQAGA KEYBOARD
     private ReplyKeyboardMarkup getSubBackKeyboard() {
         ReplyKeyboardMarkup markup = new ReplyKeyboardMarkup();
         markup.setResizeKeyboard(true);
@@ -805,6 +942,7 @@ public class JobSeekerHandler {
         return markup;
     }
 
+    // 11. TELEFON KEYBOARD
     private ReplyKeyboardMarkup getPhoneKeyboard() {
         ReplyKeyboardMarkup markup = new ReplyKeyboardMarkup();
         markup.setResizeKeyboard(true);
@@ -827,10 +965,9 @@ public class JobSeekerHandler {
         message.setChatId(chatId.toString());
         message.setText(text);
         message.setParseMode("Markdown");
-        if (keyboard != null) message.setReplyMarkup(keyboard);
+        if (keyboard != null) {
+            message.setReplyMarkup(keyboard);
+        }
         return message;
     }
-
-
-
 }
