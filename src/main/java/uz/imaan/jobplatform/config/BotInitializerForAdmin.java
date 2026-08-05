@@ -8,22 +8,22 @@ import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 import org.telegram.telegrambots.updatesreceivers.DefaultBotSession;
 import uz.imaan.jobplatform.admin.TelegramBotService;
 
+
 @Component
 
 public class BotInitializerForAdmin {
 
-    private final TelegramBotService botService;
+    private final TelegramBotService adminBotService;
 
-    // В конструкторе используем TelegramBotService вместо Telegram
-    public BotInitializerForAdmin(TelegramBotService botService) {
-        this.botService = botService;
+    public BotInitializerForAdmin(TelegramBotService adminBotService) {
+        this.adminBotService = adminBotService;
     }
 
     @EventListener({ContextRefreshedEvent.class})
-    public void init() throws TelegramApiException {
-        TelegramBotsApi telegramBotsApi = new TelegramBotsApi(DefaultBotSession.class);
+    public void init() {
         try {
-            telegramBotsApi.registerBot(botService);
+            TelegramBotsApi telegramBotsApi = new TelegramBotsApi(DefaultBotSession.class);
+            telegramBotsApi.registerBot(adminBotService);
         } catch (TelegramApiException e) {
             e.printStackTrace();
         }
