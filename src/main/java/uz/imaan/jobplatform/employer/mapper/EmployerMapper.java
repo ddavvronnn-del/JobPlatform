@@ -1,6 +1,6 @@
 package uz.imaan.jobplatform.employer.mapper;
 
-import uz.imaan.jobplatform.employer.EmployerEntity;
+import uz.imaan.jobplatform.employer.entity.EmployerEntity;
 import org.springframework.stereotype.Component;
 import uz.imaan.jobplatform.employer.dto.EmployerCreateDTO;
 import uz.imaan.jobplatform.employer.dto.EmployerResponseDTO;

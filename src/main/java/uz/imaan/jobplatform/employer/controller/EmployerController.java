@@ -3,10 +3,10 @@ package uz.imaan.jobplatform.employer.controller;
 import uz.imaan.jobplatform.employer.dto.EmployerCreateDTO;
 import uz.imaan.jobplatform.employer.dto.EmployerResponseDTO;
 import uz.imaan.jobplatform.employer.dto.EmployerUpdateDTO;
-import uz.imaan.jobplatform.employer.service.EmployerService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import uz.imaan.jobplatform.employer.service.interfacee.EmployerService;
 
 import java.util.List;
 

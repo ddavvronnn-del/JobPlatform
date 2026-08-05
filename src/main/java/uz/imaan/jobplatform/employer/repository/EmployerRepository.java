@@ -1,6 +1,6 @@
 package uz.imaan.jobplatform.employer.repository;
 
-import uz.imaan.jobplatform.employer.EmployerEntity;
+import uz.imaan.jobplatform.employer.entity.EmployerEntity;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
