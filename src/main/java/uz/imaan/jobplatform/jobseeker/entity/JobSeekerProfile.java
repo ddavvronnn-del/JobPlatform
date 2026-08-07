@@ -19,6 +19,7 @@ import java.util.List;
 
 public class JobSeekerProfile {
 
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -47,13 +48,16 @@ public class JobSeekerProfile {
     private BigDecimal walletBalance;
 
     // ============================================
-    // ✅ YANGI FIELD'LAR
+    // YANGI FIELD'LAR
     // ============================================
     @Column(name = "experience", length = 1000)
     private String experience;
 
     @Column(name = "preferred_job_type")
     private String preferredJobType;
+
+    @Column(name = "category")
+    private String category;
 
     // ============================================
     // ADMIN UCHUN
