@@ -33,16 +33,16 @@ public class Telegram extends TelegramLongPollingBot {
 
     @Autowired
     public Telegram(JobSeekerHandler jobSeekerHandler, EmployerHandler employerHandler) {
-        super("8449248126:AAFPgTpsBD2o1k_cp8YbG8_wqp9o8KnRCss");
-//        super("8154214384:AAFQfV-2YTxwyYKYWeTH9xZV70iAcOkdDuw");
+//        super("8449248126:AAFPgTpsBD2o1k_cp8YbG8_wqp9o8KnRCss");
+        super("8154214384:AAFQfV-2YTxwyYKYWeTH9xZV70iAcOkdDuw");
         this.jobSeekerHandler = jobSeekerHandler;
         this.employerHandler = employerHandler;
     }
 
     @Override
     public String getBotUsername() {
-        return "@JobPlatformUzBot";
-//        return "@Davron_first_bot";
+//        return "@JobPlatformUzBot";
+        return "@Davron_first_bot";
     }
 
     @Override

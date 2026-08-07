@@ -12,27 +12,19 @@ import java.util.List;
 
 public interface WalletService {
 
-    // ============================================
     // KARTA SERVICES
-    // ============================================
     BankCard addBankCard(Long userId, BankCardRequest request);
-
     List<BankCard> getMyCards(Long userId);
-
     void validateExpireDate(String expireDate);
-
     boolean isCardExpired(String expireDate);
 
-    // ============================================
-    // TRANZAKSIYA SERVICES
-    // ============================================
-    List<WalletTransaction> getTransactionHistory(Long userId);
 
+    // TRANZAKSIYA SERVICES
+    List<WalletTransaction> getTransactionHistory(Long userId);
     String withdrawMoney(Long userId, BigDecimal amount);
 
-    // ============================================
+
     // PROFIL SERVICES (Wallet uchun)
-    // ============================================
     JobSeekerProfile getProfileByUserId(Long userId);
 
 }
