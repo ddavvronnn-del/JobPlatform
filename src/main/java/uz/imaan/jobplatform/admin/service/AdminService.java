@@ -29,6 +29,7 @@ public class AdminService {
         this.jobSeekerProfileRepository = jobSeekerProfileRepository;
     }
 
+
     public List<AdminDTO> getAllAdmins() {
         return adminRepository.findAll()
                 .stream()
