@@ -44,6 +44,7 @@ public class JobSeekerProfile {
     @Column(length = 1000)
     private String portfolio;
 
+
     @Column(name = "wallet_balance", precision = 19, scale = 2)
     private BigDecimal walletBalance;
 

@@ -7,13 +7,16 @@ import uz.imaan.jobplatform.admin.entity.Admin;
 
 import uz.imaan.jobplatform.admin.dto.AdminDTO;
 import uz.imaan.jobplatform.admin.mapper.AdminMapper;
-import uz.imaan.jobplatform.admin.repostory.AdminRepository;
+import uz.imaan.jobplatform.admin.repository.AdminRepository;
 import uz.imaan.jobplatform.jobseeker.entity.JobSeekerProfile;
 import uz.imaan.jobplatform.jobseeker.repository.JobSeekerProfileRepository;
 
 
 import java.util.List;
 import java.util.stream.Collectors;
+
+
+
 @Service
 public class AdminService {
     private final AdminRepository adminRepository;
@@ -114,6 +117,10 @@ public class AdminService {
                 worker.getRating() != null ? worker.getRating() : 0.0
         );
     }
+
+
+    // Метод для отправки уведомления админу из любых других сервисов
+
 
 }
 

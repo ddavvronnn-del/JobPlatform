@@ -1,6 +1,5 @@
 package uz.imaan.jobplatform.admin;
 
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.telegram.telegrambots.bots.TelegramLongPollingBot;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
@@ -19,12 +18,15 @@ import java.util.List;
 @Service
 public class TelegramBotService extends TelegramLongPollingBot {
 
-    private final String botUsername = "jobplatform_admin_bot";
+    private String botUsername = "jobplatform_admin_bot";
     private final AdminService adminService;
 
     // Передаем токен напрямую в super(), минуя @Value и application.properties
+    private final Long adminTelegramId = 6326035618L; // 👈 ВСТАВЬ СЮДА СВОЙ TELEGRAM ID
+
     public TelegramBotService(AdminService adminService) {
         super("8470148420:AAEcjcwI9sKspY94OFiB7V5gqmAjQvgVhPY");
+        this.botUsername = "jobplatform_admin_bot";
         this.adminService = adminService;
     }
 
@@ -48,6 +50,7 @@ public class TelegramBotService extends TelegramLongPollingBot {
     }
 
     private void handleTextMessage(Message message) {
+        
         long chatId = message.getChatId();
         long userId = message.getFrom().getId();
         String text = message.getText();
@@ -198,10 +201,13 @@ public class TelegramBotService extends TelegramLongPollingBot {
                 .replyMarkup(keyboard)
                 .build();
         try {
-            execute(message);
+            execute(message); // 👈 Замени editMessageText на message
         } catch (TelegramApiException e) {
-            e.printStackTrace();
+            if (!e.getMessage().contains("message is not modified")) {
+                e.printStackTrace();
+            }
         }
+
     }
 
     private void executeMessage(SendMessage message) {
@@ -239,5 +245,17 @@ public class TelegramBotService extends TelegramLongPollingBot {
                 .build();
 
         executeMessage(sendMessage);
+    }
+    public void notifyAdmin(String notificationText) {
+        SendMessage message = SendMessage.builder()
+                .chatId(adminTelegramId.toString())
+                .text(notificationText)
+                .parseMode("Markdown")
+                .build();
+        try {
+            execute(message); // Здесь execute() работает, потому что класс наследует TelegramLongPollingBot
+        } catch (TelegramApiException e) {
+            e.printStackTrace();
+        }
     }
 }

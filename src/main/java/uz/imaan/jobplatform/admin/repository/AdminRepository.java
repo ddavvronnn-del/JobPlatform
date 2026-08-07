@@ -1,4 +1,4 @@
-package uz.imaan.jobplatform.admin.repostory;
+package uz.imaan.jobplatform.admin.repository;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;

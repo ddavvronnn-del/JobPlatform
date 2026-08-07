@@ -1,6 +1,15 @@
 package uz.imaan.jobplatform.employer.job;
 
+import jakarta.persistence.*;
+import lombok.Data;
+
+@Entity // 👈 ДОБАВЬ ЭТУ СТРОЧКУ!
+@Table(name = "job_vacancies")
+@Data
 public class JobVacancy {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
     private Long employerChatId;
     private String title;
     private String category;
@@ -20,4 +29,5 @@ public class JobVacancy {
     public String getCategory() { return category; }
     public String getType() { return type; }
     public String getSalary() { return salary; }
+
 }
