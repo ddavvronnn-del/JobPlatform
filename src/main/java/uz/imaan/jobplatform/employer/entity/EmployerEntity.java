@@ -7,11 +7,11 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "employer_jobs")
+@Table(name = "employers")
 @Getter
 @Setter
-@AllArgsConstructor
 @NoArgsConstructor
+@AllArgsConstructor
 @Builder
 public class EmployerEntity {
 
@@ -19,27 +19,23 @@ public class EmployerEntity {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = false)
     private Long employerChatId;
+    private String fullName;
+    private String title;
+    private String category;
+    private String jobType;
+    private String salary;         // <-- String bo'lishi kerak
+    private String workHours;      // <-- String bo'lishi kerak
+    private String requirements;
+    private String status;
+    private LocalDateTime createdAt;
 
     private String inn;
     private String passportSeriesNumber;
-    private String fullName;
     private String phoneNumber;
-
-    private LocalDateTime createdAt;
-    private String category;
-    private String jobType;
-    private Double salary;
-    private Integer workHours;
     private LocalDate jobDate;
     private Integer workerCount;
-    private String requirements;
     private Boolean foodProvided;
-
     private Double latitude;
     private Double longitude;
-
-    @Builder.Default
-    private String status = "PENDING";
 }

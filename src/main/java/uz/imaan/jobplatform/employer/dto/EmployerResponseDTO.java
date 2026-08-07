@@ -24,8 +24,8 @@ public class EmployerResponseDTO {
 
     private String category;
     private String jobType;
-    private Double salary;
-    private Integer workHours;
+    private String salary;
+    private String workHours;
     private LocalDate jobDate;
     private Integer workerCount;
     private String requirements;

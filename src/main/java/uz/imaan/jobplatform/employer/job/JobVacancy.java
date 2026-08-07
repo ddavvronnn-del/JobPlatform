@@ -1,15 +1,21 @@
 package uz.imaan.jobplatform.employer.job;
 
 import jakarta.persistence.*;
+import lombok.AllArgsConstructor;
 import lombok.Data;
+import lombok.NoArgsConstructor;
 
-@Entity // 👈 ДОБАВЬ ЭТУ СТРОЧКУ!
+@Entity
 @Table(name = "job_vacancies")
 @Data
+@NoArgsConstructor
+@AllArgsConstructor
 public class JobVacancy {
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+
     private Long employerChatId;
     private String title;
     private String category;
@@ -23,11 +29,4 @@ public class JobVacancy {
         this.type = type;
         this.salary = salary;
     }
-
-    public Long getEmployerChatId() { return employerChatId; }
-    public String getTitle() { return title; }
-    public String getCategory() { return category; }
-    public String getType() { return type; }
-    public String getSalary() { return salary; }
-
 }

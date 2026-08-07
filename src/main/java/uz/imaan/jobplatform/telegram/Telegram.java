@@ -1,9 +1,11 @@
 package uz.imaan.jobplatform.telegram;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.telegram.telegrambots.bots.TelegramLongPollingBot;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
+import org.telegram.telegrambots.meta.api.objects.CallbackQuery;
 import org.telegram.telegrambots.meta.api.objects.Message;
 import org.telegram.telegrambots.meta.api.objects.Update;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.ReplyKeyboardMarkup;
@@ -28,13 +30,13 @@ public class Telegram extends TelegramLongPollingBot {
     private final JobSeekerHandler jobSeekerHandler;
     private final EmployerHandler employerHandler;
 
-    // Har bir chatId bo'yicha rolini eslab qolamiz
     private final Map<Long, UserRole> userRoles = new ConcurrentHashMap<>();
 
     @Autowired
-    public Telegram(JobSeekerHandler jobSeekerHandler, EmployerHandler employerHandler) {
-        super("8449248126:AAFPgTpsBD2o1k_cp8YbG8_wqp9o8KnRCss");
-//        super("8154214384:AAFQfV-2YTxwyYKYWeTH9xZV70iAcOkdDuw");
+    public Telegram(JobSeekerHandler jobSeekerHandler,
+                    EmployerHandler employerHandler,
+                    @Value("${bot.token:8449248126:AAFPgTpsBD2o1k_cp8YbG8_wqp9o8KnRCss}") String botToken) {
+        super(botToken);
         this.jobSeekerHandler = jobSeekerHandler;
         this.employerHandler = employerHandler;
     }
@@ -42,25 +44,31 @@ public class Telegram extends TelegramLongPollingBot {
     @Override
     public String getBotUsername() {
         return "@JobPlatformUzBot";
-//        return "@Davron_first_bot";
     }
 
     @Override
     public void onUpdateReceived(Update update) {
+        // 1. Inline tugmalar (CallbackQuery) bosilganda qabul qilish
+        if (update.hasCallbackQuery()) {
+            handleCallbackQuery(update.getCallbackQuery());
+            return;
+        }
+
+        // 2. Oddiy xabar bo'lmasa to'xtatish
         if (!update.hasMessage()) return;
 
         Message message = update.getMessage();
         Long chatId = message.getChatId();
         String text = message.hasText() ? message.getText() : "";
 
-        // 1. /start yoki "Asosiy menyu" bosilsa
-        if (text.equals("/start") || text.equals("Asosiy menyu")) {
+        // 3. Faqat /start yoki Rolni o'zgartirish bosilganda rol tozalanadi
+        if (text.equals("/start") || text.equals("🔄 Rolni o'zgartirish")) {
             userRoles.put(chatId, UserRole.NONE);
-            sendRoleSelectionMenu(chatId, "Hush kelibsiz! Rolingizni tanlang:");
+            sendRoleSelectionMenu(chatId, "Xush kelibsiz! Rolingizni tanlang:");
             return;
         }
 
-        // 2. Rol tanlanganda userRoles xaritasida saqlaymiz
+        // 4. Rol tanlanganda
         if (text.contains("Employer (Ish beruvchi)") || text.contains("Ish beruvchi (Employer)")) {
             userRoles.put(chatId, UserRole.EMPLOYER);
         } else if (text.contains("JobSeeker (Ish izlovchi)") || text.contains("Ish izlovchi (JobSeeker)")) {
@@ -69,7 +77,7 @@ public class Telegram extends TelegramLongPollingBot {
 
         UserRole role = userRoles.getOrDefault(chatId, UserRole.NONE);
 
-        // 3. Tanlangan roliga muvofiq Xabar FAQAT tegishli handlerga boradi
+        // 5. Tegishli handlerga yo'naltirish
         if (role == UserRole.EMPLOYER) {
             SendMessage response = employerHandler.handleEmployer(message);
             if (response != null) executeMessage(response);
@@ -77,11 +85,13 @@ public class Telegram extends TelegramLongPollingBot {
             SendMessage response = jobSeekerHandler.handleJobSeeker(message);
             if (response != null) executeMessage(response);
         } else {
-            // Rol hali tanlanmagan bo'lsa
             sendRoleSelectionMenu(chatId, "Iltimos, avval rolingizni tanlang:");
         }
     }
-    
+
+    private void handleCallbackQuery(CallbackQuery callbackQuery) {
+        // CallbackQuery logikasi uchun (inline tugmalar bosilganda)
+    }
 
     private void sendRoleSelectionMenu(Long chatId, String text) {
         SendMessage message = new SendMessage(chatId.toString(), text);
@@ -100,7 +110,7 @@ public class Telegram extends TelegramLongPollingBot {
         executeMessage(message);
     }
 
-    private void executeMessage(SendMessage message) {
+    public void executeMessage(SendMessage message) {
         try {
             execute(message);
         } catch (TelegramApiException e) {

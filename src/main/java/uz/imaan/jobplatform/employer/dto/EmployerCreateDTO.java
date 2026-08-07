@@ -13,16 +13,17 @@ import java.time.LocalDate;
 @AllArgsConstructor
 public class EmployerCreateDTO {
 
-    //post
+    // post
     private Long employerChatId;
     private String inn;
     private String passportSeriesNumber;
     private String phoneNumber;
 
+    private String title;            // <-- Qo'shildi (Ish sarlavhasi uchun)
     private String category;
     private String jobType;
-    private Double salary;
-    private Integer workHours;
+    private String salary;           // <-- String ga o'tkazildi (Matn ko'rinishida saqlash uchun)
+    private String workHours;        // <-- String ga o'tkazildi ("09:00 - 18:00" uchun)
     private LocalDate jobDate;
     private Integer workerCount;
     private String requirements;
