@@ -99,7 +99,7 @@ public class JobSeekerHandler {
     }
 
     // ============================================
-    // KATEGORIYA INLINE KEYBOARD 🆕
+    // KATEGORIYA INLINE KEYBOARD
     // ============================================
     public InlineKeyboardMarkup getCategoryInlineKeyboard(Optional<JobSeekerProfile> profileOpt) {
         InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
@@ -191,6 +191,174 @@ public class JobSeekerHandler {
         if (isRussian(profileOpt)) return ru;
         if (isEnglish(profileOpt)) return en;
         return uz;
+    }
+
+    // ============================================
+    // KATEGORIYA BO'YICHA VAKANSIYALARNI QIDIRISH 🆕
+    // ============================================
+    private void handleCategorySearch(Long chatId, String categoryKey, Optional<JobSeekerProfile> profileOpt) {
+        try {
+            // 1. Kategoriya nomini olish
+            String categoryName = getCategoryName(categoryKey);
+            log.info("🔍 Kategoriya bo'yicha qidiruv: chatId={}, category={}, key={}", chatId, categoryName, categoryKey);
+
+            // 2. Vakansiyalarni qidirish
+            List<JobVacancy> vacancies;
+            if (categoryKey.equals("all")) {
+                vacancies = jobStore.getAllVacancies();
+            } else {
+                vacancies = jobStore.getAllVacancies().stream()
+                        .filter(v -> v.getCategory() != null &&
+                                v.getCategory().toLowerCase().contains(categoryName.toLowerCase()))
+                        .toList();
+            }
+
+            // 3. Natijani tekshiramiz
+            if (vacancies == null || vacancies.isEmpty()) {
+                String msg = getText(profileOpt,
+                        "❌ Ushbu kategoriya bo'yicha hozircha faol vakansiyalar mavjud emas.",
+                        "❌ Ushbu kategoriya bo'yicha hozircha faol vakansiyalar mavjud emas.",
+                        "❌ No active vacancies available for this category."
+                );
+                sendMessage(chatId, msg);
+                return;
+            }
+
+            // 4. Vakansiyalarni ko'rsatish (inline keyboard bilan)
+            StringBuilder result = new StringBuilder();
+            String title = getText(profileOpt,
+                    "📋 **Topilgan vakansiyalar (" + vacancies.size() + "):**\n\n",
+                    "📋 **Topilgan vakansiyalar (" + vacancies.size() + "):**\n\n",
+                    "📋 **Found vacancies (" + vacancies.size() + "):**\n\n"
+            );
+            result.append(title);
+
+            // Har bir vakansiyani ko'rsatish
+            for (int i = 0; i < vacancies.size(); i++) {
+                JobVacancy vacancy = vacancies.get(i);
+                result.append(i + 1).append(". 📌 **").append(vacancy.getTitle()).append("**\n");
+                result.append("   📂 Kategoriya: ").append(vacancy.getCategory()).append("\n");
+                result.append("   💰 Maosh: ").append(vacancy.getSalary()).append("\n");
+                result.append("───────────────\n");
+            }
+
+            // "Orqaga" tugmasi bilan inline keyboard
+            InlineKeyboardMarkup backMarkup = new InlineKeyboardMarkup();
+            List<List<InlineKeyboardButton>> backRows = new ArrayList<>();
+            List<InlineKeyboardButton> backRow = new ArrayList<>();
+            String backText = isRussian(profileOpt) ? "⬅️ Назад" : (isEnglish(profileOpt) ? "⬅️ Back" : "⬅️ Orqaga");
+            backRow.add(InlineKeyboardButton.builder()
+                    .text(backText)
+                    .callbackData("back_to_categories")
+                    .build());
+            backRows.add(backRow);
+            backMarkup.setKeyboard(backRows);
+
+            SendMessage response = new SendMessage();
+            response.setChatId(chatId.toString());
+            response.setText(result.toString());
+            response.setParseMode("Markdown");
+            response.setReplyMarkup(backMarkup);
+            executeMessage(response);
+
+        } catch (Exception e) {
+            log.error("❌ Kategoriya bo'yicha qidiruvda xatolik: {}", e.getMessage());
+            String msg = getText(profileOpt,
+                    "❌ Xatolik yuz berdi. Qaytadan urinib ko'ring.",
+                    "❌ Xatolik yuz berdi. Qaytadan urinib ko'ring.",
+                    "❌ An error occurred. Please try again."
+            );
+            sendMessage(chatId, msg);
+        }
+    }
+
+    // ============================================
+    // KATEGORIYA NOMINI OLISH
+    // ============================================
+    private String getCategoryName(String key) {
+        return switch (key) {
+            case "it" -> "💻 IT & Dasturlash";
+            case "design" -> "🎨 Dizayn";
+            case "construction" -> "🏗️ Qurilish";
+            case "driver" -> "🚗 Haydovchi / Kuryer";
+            case "education" -> "📚 Ta'lim / Repetitor";
+            case "trade" -> "🛒 Savdo / Sotuvchi";
+            case "cleaner" -> "🧹 Farrosh / Tozalash";
+            case "cook" -> "👨‍🍳 Pazanda / Oshpaz";
+            case "security" -> "🔒 Qorovul / Xavfsizlik";
+            case "courier" -> "📦 Kuryer / Yetkazib berish";
+            case "all" -> "Barcha vakansiyalar";
+            default -> key;
+        };
+    }
+
+    // ============================================
+    // VAKANSIYANI ARIZA TUGMASI BILAN YUBORISH 🆕
+    // ============================================
+    private void sendVacancyWithApplyButton(Long chatId, JobVacancy vacancy, Optional<JobSeekerProfile> profileOpt) {
+        String vacancyText = String.format(
+                "📌 **%s**\n" +
+                        "📁 Kategoriya: %s\n" +
+                        "💰 Maosh: %s\n" +
+                        "📝 Tavsif: %s",
+                vacancy.getTitle(),
+                vacancy.getCategory() != null ? vacancy.getCategory() : "Ko'rsatilmagan",
+                vacancy.getSalary() != null ? vacancy.getSalary() : "Kelishilgan",
+                vacancy.getTitle() != null ? vacancy.getTitle() : "Mavjud emas"
+        );
+
+        // Ariza topshirish tugmasi bilan inline keyboard
+        InlineKeyboardMarkup applyMarkup = new InlineKeyboardMarkup();
+        List<List<InlineKeyboardButton>> applyRows = new ArrayList<>();
+        List<InlineKeyboardButton> applyRow = new ArrayList<>();
+        String applyText = isRussian(profileOpt) ? "📝 Подать заявку" : (isEnglish(profileOpt) ? "📝 Submit application" : "📝 Ariza topshirish");
+        applyRow.add(InlineKeyboardButton.builder()
+                .text(applyText)
+                .callbackData("apply_" + vacancy.getId())
+                .build());
+        applyRows.add(applyRow);
+        applyMarkup.setKeyboard(applyRows);
+
+        SendMessage message = new SendMessage();
+        message.setChatId(chatId.toString());
+        message.setText(vacancyText);
+        message.setParseMode("Markdown");
+        message.setReplyMarkup(applyMarkup);
+
+        try {
+            Telegram telegramBot = applicationContext.getBean(Telegram.class);
+            telegramBot.execute(message);
+        } catch (Exception e) {
+            log.error("❌ Vakansiyani yuborishda xatolik: {}", e.getMessage());
+        }
+    }
+
+    // ============================================
+    // XABAR YUBORISH (YORDAMCHI METOD)
+    // ============================================
+    private void sendMessage(Long chatId, String text) {
+        SendMessage message = new SendMessage();
+        message.setChatId(chatId.toString());
+        message.setText(text);
+        message.setParseMode("Markdown");
+        try {
+            Telegram telegramBot = applicationContext.getBean(Telegram.class);
+            telegramBot.execute(message);
+        } catch (Exception e) {
+            log.error("❌ Xabar yuborishda xatolik: {}", e.getMessage());
+        }
+    }
+
+    // ============================================
+    // XABAR YUBORISH (Telegram orqali)
+    // ============================================
+    private void executeMessage(SendMessage message) {
+        try {
+            Telegram telegramBot = applicationContext.getBean(Telegram.class);
+            telegramBot.execute(message);
+        } catch (Exception e) {
+            log.error("❌ Xabar yuborishda xatolik: {}", e.getMessage());
+        }
     }
 
     public SendMessage handleJobSeeker(Message message) {

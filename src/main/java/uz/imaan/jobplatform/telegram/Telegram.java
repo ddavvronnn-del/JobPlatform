@@ -17,6 +17,10 @@ import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.Keyboard
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 import uz.imaan.jobplatform.employer.job.JobStore;
 import uz.imaan.jobplatform.employer.job.JobVacancy;
+import uz.imaan.jobplatform.jobseeker.entity.JobApplication;
+import uz.imaan.jobplatform.jobseeker.entity.JobSeekerProfile;
+import uz.imaan.jobplatform.jobseeker.repository.JobApplicationRepository;
+import uz.imaan.jobplatform.jobseeker.repository.JobSeekerProfileRepository;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -37,25 +41,30 @@ public class Telegram extends TelegramLongPollingBot {
     private final JobSeekerHandler jobSeekerHandler;
     private final EmployerHandler employerHandler;
     private final JobStore jobStore;
+    private final JobSeekerProfileRepository jobSeekerProfileRepository;
+    private final JobApplicationRepository jobApplicationRepository;
 
     private final Map<Long, UserRole> userRoles = new ConcurrentHashMap<>();
 
     @Autowired
-    public Telegram(JobSeekerHandler jobSeekerHandler,
-                    EmployerHandler employerHandler,
-                    JobStore jobStore,
-                    @Value("8449248126:AAFPgTpsBD2o1k_cp8YbG8_wqp9o8KnRCss") String botToken) {
-//                    @Value("8154214384:AAFQfV-2YTxwyYKYWeTH9xZV70iAcOkdDuw") String botToken) {
+    public Telegram(
+            JobSeekerHandler jobSeekerHandler,
+            EmployerHandler employerHandler,
+            JobStore jobStore,
+            JobSeekerProfileRepository jobSeekerProfileRepository,
+            JobApplicationRepository jobApplicationRepository,
+            @Value("8449248126:AAFPgTpsBD2o1k_cp8YbG8_wqp9o8KnRCss") String botToken) {
         super(botToken);
         this.jobSeekerHandler = jobSeekerHandler;
         this.employerHandler = employerHandler;
         this.jobStore = jobStore;
+        this.jobSeekerProfileRepository = jobSeekerProfileRepository;
+        this.jobApplicationRepository = jobApplicationRepository;
     }
 
     @Override
     public String getBotUsername() {
         return "@JobPlatformUzBot";
-//        return "@Davron_first_bot";
     }
 
     @Override
@@ -95,7 +104,7 @@ public class Telegram extends TelegramLongPollingBot {
                 }
 
                 // ============================================
-                // KATEGORIYA TANLASH 🆕
+                // KATEGORIYA TANLASH
                 // ============================================
                 if (callbackData.startsWith("category_")) {
                     String categoryKey = callbackData.replace("category_", "");
@@ -160,6 +169,75 @@ public class Telegram extends TelegramLongPollingBot {
                     response.setText("📂 **Kategoriyani tanlang:**");
                     response.setParseMode("Markdown");
                     response.setReplyMarkup(jobSeekerHandler.getCategoryInlineKeyboard(Optional.empty()));
+                    executeMessage(response);
+                    return;
+                }
+
+                // ============================================
+                // ARIZA TOPSHIRISH (apply_123) 🆕
+                // ============================================
+                if (callbackData.startsWith("apply_")) {
+                    Long vacancyId = Long.parseLong(callbackData.replace("apply_", ""));
+
+                    // Foydalanuvchi ro'yxatdan o'tganligini tekshirish
+                    Optional<JobSeekerProfile> profileOpt = jobSeekerProfileRepository.findByUserId(chatId);
+                    if (profileOpt.isEmpty()) {
+                        SendMessage response = new SendMessage();
+                        response.setChatId(chatId.toString());
+                        response.setText("❌ Iltimos, avval ro'yxatdan o'ting!");
+                        executeMessage(response);
+                        return;
+                    }
+
+                    // Vakansiyani topish
+                    JobVacancy vacancy = jobStore.getAllVacancies().stream()
+                            .filter(v -> v.getId().equals(vacancyId))
+                            .findFirst()
+                            .orElse(null);
+
+                    if (vacancy == null) {
+                        SendMessage response = new SendMessage();
+                        response.setChatId(chatId.toString());
+                        response.setText("❌ Vakansiya topilmadi!");
+                        executeMessage(response);
+                        return;
+                    }
+
+                    // Arizani saqlash
+                    JobSeekerProfile profile = profileOpt.get();
+                    JobApplication application = new JobApplication();
+                    application.setJobId(vacancy.getId());
+                    application.setJobSeekerId(profile.getId());
+                    application.setCoverLetter("Ariza topshirildi");
+                    application.setStatus(JobApplication.ApplicationStatus.PENDING);
+                    jobApplicationRepository.save(application);
+
+                    // Ish beruvchiga xabar yuborish
+                    Long employerChatId = vacancy.getEmployerChatId();
+                    if (employerChatId != null) {
+                        String notifyText = String.format(
+                                "📩 **Vakansiyangizga yangi ariza keldi!**\n\n" +
+                                        "📌 **Vakansiya:** %s\n" +
+                                        "👤 **Nomzod:** %s\n" +
+                                        "🪪 **Pasport:** %s\n" +
+                                        "📞 **Tel:** %s\n" +
+                                        "📝 **Tajriba:** %s",
+                                vacancy.getTitle(),
+                                profile.getFullName() != null ? profile.getFullName() : "Kiritilmagan",
+                                profile.getPassportNumber() != null ? profile.getPassportNumber() : "Kiritilmagan",
+                                profile.getPhoneNumber() != null ? profile.getPhoneNumber() : "Kiritilmagan",
+                                profile.getExperience() != null ? profile.getExperience() : "Kiritilmagan"
+                        );
+
+                        SendMessage notifyMsg = new SendMessage(employerChatId.toString(), notifyText);
+                        notifyMsg.setParseMode("Markdown");
+                        executeMessage(notifyMsg);
+                    }
+
+                    // Foydalanuvchiga javob yuborish
+                    SendMessage response = new SendMessage();
+                    response.setChatId(chatId.toString());
+                    response.setText("✅ Ariza muvaffaqiyatli topshirildi!");
                     executeMessage(response);
                     return;
                 }
@@ -293,6 +371,9 @@ public class Telegram extends TelegramLongPollingBot {
         };
     }
 
+    // ============================================
+    // XABAR YUBORISH
+    // ============================================
     private void executeMessage(SendMessage message) {
         try {
             execute(message);
