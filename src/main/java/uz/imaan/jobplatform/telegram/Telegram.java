@@ -1,5 +1,6 @@
 package uz.imaan.jobplatform.telegram;
 
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
@@ -8,16 +9,22 @@ import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
 import org.telegram.telegrambots.meta.api.objects.CallbackQuery;
 import org.telegram.telegrambots.meta.api.objects.Message;
 import org.telegram.telegrambots.meta.api.objects.Update;
+import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.ReplyKeyboardMarkup;
+import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardButton;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.KeyboardButton;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.KeyboardRow;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
+import uz.imaan.jobplatform.employer.job.JobStore;
+import uz.imaan.jobplatform.employer.job.JobVacancy;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 
+@Slf4j
 @Component
 public class Telegram extends TelegramLongPollingBot {
 
@@ -29,46 +36,165 @@ public class Telegram extends TelegramLongPollingBot {
 
     private final JobSeekerHandler jobSeekerHandler;
     private final EmployerHandler employerHandler;
+    private final JobStore jobStore;
 
     private final Map<Long, UserRole> userRoles = new ConcurrentHashMap<>();
 
     @Autowired
     public Telegram(JobSeekerHandler jobSeekerHandler,
                     EmployerHandler employerHandler,
-                    @Value("${bot.token:8449248126:AAFPgTpsBD2o1k_cp8YbG8_wqp9o8KnRCss}") String botToken) {
+                    JobStore jobStore,
+                    @Value("8449248126:AAFPgTpsBD2o1k_cp8YbG8_wqp9o8KnRCss") String botToken) {
+//                    @Value("8154214384:AAFQfV-2YTxwyYKYWeTH9xZV70iAcOkdDuw") String botToken) {
         super(botToken);
         this.jobSeekerHandler = jobSeekerHandler;
         this.employerHandler = employerHandler;
+        this.jobStore = jobStore;
     }
 
     @Override
     public String getBotUsername() {
         return "@JobPlatformUzBot";
+//        return "@Davron_first_bot";
     }
 
     @Override
     public void onUpdateReceived(Update update) {
-        // 1. Inline tugmalar (CallbackQuery) bosilganda qabul qilish
+
+        // ============================================
+        // 1. CALLBACK QUERY (INLINE TUGMALAR)
+        // ============================================
         if (update.hasCallbackQuery()) {
-            handleCallbackQuery(update.getCallbackQuery());
+            CallbackQuery callbackQuery = update.getCallbackQuery();
+            String callbackData = callbackQuery.getData();
+            Long chatId = callbackQuery.getMessage().getChatId();
+
+            log.info("📩 Callback: chatId={}, data={}", chatId, callbackData);
+
+            try {
+                // ============================================
+                // TIL TANLASH (lang_uz, lang_ru, lang_en)
+                // ============================================
+                if (callbackData.startsWith("lang_")) {
+                    String language = callbackData.replace("lang_", "");
+                    jobSeekerHandler.updateLanguage(chatId, language);
+
+                    String responseText = switch (language) {
+                        case "uz" -> "✅ Til O'zbek tiliga o'zgartirildi!";
+                        case "ru" -> "✅ Язык изменен на Русский!";
+                        case "en" -> "✅ Language changed to English!";
+                        default -> "❌ Noto'g'ri tanlov!";
+                    };
+
+                    SendMessage response = new SendMessage();
+                    response.setChatId(chatId.toString());
+                    response.setText(responseText);
+                    response.setReplyMarkup(null);
+                    executeMessage(response);
+                    return;
+                }
+
+                // ============================================
+                // KATEGORIYA TANLASH 🆕
+                // ============================================
+                if (callbackData.startsWith("category_")) {
+                    String categoryKey = callbackData.replace("category_", "");
+                    String categoryName = getCategoryName(categoryKey);
+
+                    List<JobVacancy> vacancies;
+                    if (categoryKey.equals("all")) {
+                        vacancies = jobStore.getAllVacancies();
+                    } else {
+                        vacancies = jobStore.getAllVacancies().stream()
+                                .filter(v -> v.getCategory() != null &&
+                                        v.getCategory().contains(categoryName))
+                                .toList();
+                    }
+
+                    if (vacancies == null || vacancies.isEmpty()) {
+                        String msg = "🔍 Ushbu kategoriya bo'yicha hozircha vakansiyalar mavjud emas.";
+                        SendMessage response = new SendMessage();
+                        response.setChatId(chatId.toString());
+                        response.setText(msg);
+                        response.setReplyMarkup(jobSeekerHandler.getCategoryInlineKeyboard(Optional.empty()));
+                        executeMessage(response);
+                        return;
+                    }
+
+                    // Vakansiyalarni ko'rsatish
+                    StringBuilder result = new StringBuilder("💼 **Topilgan vakansiyalar (" + vacancies.size() + "):**\n\n");
+                    for (int i = 0; i < vacancies.size(); i++) {
+                        JobVacancy v = vacancies.get(i);
+                        result.append(i + 1).append(". 📌 **").append(v.getTitle()).append("**\n");
+                        result.append("   📂 Kategoriya: ").append(v.getCategory()).append("\n");
+                        result.append("   💰 Maosh: ").append(v.getSalary()).append("\n");
+                        result.append("───────────────\n");
+                    }
+
+                    // Orqaga tugmasi
+                    InlineKeyboardMarkup backMarkup = new InlineKeyboardMarkup();
+                    List<List<InlineKeyboardButton>> backRows = new ArrayList<>();
+                    List<InlineKeyboardButton> backRow = new ArrayList<>();
+                    backRow.add(InlineKeyboardButton.builder()
+                            .text("⬅️ Orqaga")
+                            .callbackData("back_to_categories")
+                            .build());
+                    backRows.add(backRow);
+                    backMarkup.setKeyboard(backRows);
+
+                    SendMessage response = new SendMessage();
+                    response.setChatId(chatId.toString());
+                    response.setText(result.toString());
+                    response.setParseMode("Markdown");
+                    response.setReplyMarkup(backMarkup);
+                    executeMessage(response);
+                    return;
+                }
+
+                // ============================================
+                // ORQAGA (Kategoriyalarga qaytish)
+                // ============================================
+                if (callbackData.equals("back_to_categories")) {
+                    SendMessage response = new SendMessage();
+                    response.setChatId(chatId.toString());
+                    response.setText("📂 **Kategoriyani tanlang:**");
+                    response.setParseMode("Markdown");
+                    response.setReplyMarkup(jobSeekerHandler.getCategoryInlineKeyboard(Optional.empty()));
+                    executeMessage(response);
+                    return;
+                }
+
+            } catch (Exception e) {
+                log.error("❌ Xatolik: {}", e.getMessage());
+            }
             return;
         }
 
-        // 2. Oddiy xabar bo'lmasa to'xtatish
+        // ============================================
+        // 2. TEKST XABARLAR
+        // ============================================
         if (!update.hasMessage()) return;
 
         Message message = update.getMessage();
         Long chatId = message.getChatId();
         String text = message.hasText() ? message.getText() : "";
 
-        // 3. Faqat /start yoki Rolni o'zgartirish bosilganda rol tozalanadi
-        if (text.equals("/start") || text.equals("🔄 Rolni o'zgartirish")) {
+        log.info("📩 Xabar: chatId={}, text={}", chatId, text);
+
+        // /start yoki "🔄 Rolni o'zgartirish"
+        if (text.equals("/start") || text.equals("🔄 Rolni o'zgartirish") || text.equals("Asosiy menyu")) {
             userRoles.put(chatId, UserRole.NONE);
-            sendRoleSelectionMenu(chatId, "Xush kelibsiz! Rolingizni tanlang:");
+            sendRoleSelectionMenu(chatId, "Hush kelibsiz! Rolingizni tanlang:");
             return;
         }
 
-        // 4. Rol tanlanganda
+        // Til tanlash (Inline Keyboard) uchun
+        if (text.equals("/language") || text.equals("🌐 Til") || text.equals("🌐 Язык") || text.equals("🌐 Language")) {
+            sendLanguageSelectionMenu(chatId);
+            return;
+        }
+
+        // Rol tanlanganda
         if (text.contains("Employer (Ish beruvchi)") || text.contains("Ish beruvchi (Employer)")) {
             userRoles.put(chatId, UserRole.EMPLOYER);
         } else if (text.contains("JobSeeker (Ish izlovchi)") || text.contains("Ish izlovchi (JobSeeker)")) {
@@ -77,7 +203,7 @@ public class Telegram extends TelegramLongPollingBot {
 
         UserRole role = userRoles.getOrDefault(chatId, UserRole.NONE);
 
-        // 5. Tegishli handlerga yo'naltirish
+        // Tanlangan roliga muvofiq handlerga yuborish
         if (role == UserRole.EMPLOYER) {
             SendMessage response = employerHandler.handleEmployer(message);
             if (response != null) executeMessage(response);
@@ -89,10 +215,9 @@ public class Telegram extends TelegramLongPollingBot {
         }
     }
 
-    private void handleCallbackQuery(CallbackQuery callbackQuery) {
-        // CallbackQuery logikasi uchun (inline tugmalar bosilganda)
-    }
-
+    // ============================================
+    // ROL TANLASH MENYUSI (REPLY KEYBOARD)
+    // ============================================
     private void sendRoleSelectionMenu(Long chatId, String text) {
         SendMessage message = new SendMessage(chatId.toString(), text);
         ReplyKeyboardMarkup keyboardMarkup = new ReplyKeyboardMarkup();
@@ -110,11 +235,69 @@ public class Telegram extends TelegramLongPollingBot {
         executeMessage(message);
     }
 
-    public void executeMessage(SendMessage message) {
+    // ============================================
+    // TIL TANLASH MENYUSI (INLINE KEYBOARD)
+    // ============================================
+    private void sendLanguageSelectionMenu(Long chatId) {
+        SendMessage message = new SendMessage();
+        message.setChatId(chatId.toString());
+        message.setText("🌐 **Tilni tanlang / Выберите язык:**");
+        message.setParseMode("Markdown");
+        message.setReplyMarkup(getLanguageInlineKeyboard());
+        executeMessage(message);
+    }
+
+    // ============================================
+    // INLINE KEYBOARD (TIL TANLASH)
+    // ============================================
+    private InlineKeyboardMarkup getLanguageInlineKeyboard() {
+        InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
+        List<List<InlineKeyboardButton>> rows = new ArrayList<>();
+
+        List<InlineKeyboardButton> row1 = new ArrayList<>();
+        row1.add(InlineKeyboardButton.builder()
+                .text("🇺🇿 O'zbek")
+                .callbackData("lang_uz")
+                .build());
+        row1.add(InlineKeyboardButton.builder()
+                .text("🇷🇺 Русский")
+                .callbackData("lang_ru")
+                .build());
+        row1.add(InlineKeyboardButton.builder()
+                .text("🇬🇧 English")
+                .callbackData("lang_en")
+                .build());
+
+        rows.add(row1);
+        markup.setKeyboard(rows);
+        return markup;
+    }
+
+    // ============================================
+    // KATEGORIYA NOMINI OLISH
+    // ============================================
+    private String getCategoryName(String key) {
+        return switch (key) {
+            case "it" -> "💻 IT & Dasturlash";
+            case "design" -> "🎨 Dizayn";
+            case "construction" -> "🏗️ Qurilish";
+            case "driver" -> "🚗 Haydovchi / Kuryer";
+            case "education" -> "📚 Ta'lim / Repetitor";
+            case "trade" -> "🛒 Savdo / Sotuvchi";
+            case "cleaner" -> "🧹 Farrosh / Tozalash";
+            case "cook" -> "👨‍🍳 Pazanda / Oshpaz";
+            case "security" -> "🔒 Qorovul / Xavfsizlik";
+            case "courier" -> "📦 Kuryer / Yetkazib berish";
+            case "all" -> "Barcha vakansiyalar";
+            default -> key;
+        };
+    }
+
+    private void executeMessage(SendMessage message) {
         try {
             execute(message);
         } catch (TelegramApiException e) {
-            e.printStackTrace();
+            log.error("❌ Xatolik: {}", e.getMessage());
         }
     }
 }
