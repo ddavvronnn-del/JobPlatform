@@ -3,6 +3,7 @@ package uz.imaan.jobplatform.admin.service;
 import jakarta.transaction.Transactional;
 import jakarta.validation.constraints.NotNull;
 import lombok.RequiredArgsConstructor;
+import lombok.Value;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
@@ -145,10 +146,20 @@ public class AdminService {
             System.out.println("ℹ️ Админ уже есть в базе.");
         }
     }
-    public void notifyAdmin(String message) {
-        Long adminChatId = 6326035618L;
-        telegramBotService.sendMessage(adminChatId, message); // ✅ Через внедрённый ОБЪЕКТ
+
+    private List<Long> adminChatIds = List.of(
+            6326035618L,
+            7584728450L,
+            6500351879L
+    );
+
+    public void notifyAllAdmins(String message) {
+        for (Long chatId : adminChatIds) {
+            telegramBotService.sendMessage(chatId, message);
+        }
     }
+
+    
 }
 
 
