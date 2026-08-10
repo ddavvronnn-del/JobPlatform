@@ -21,6 +21,8 @@ import uz.imaan.jobplatform.jobseeker.entity.JobApplication;
 import uz.imaan.jobplatform.jobseeker.entity.JobSeekerProfile;
 import uz.imaan.jobplatform.jobseeker.repository.JobApplicationRepository;
 import uz.imaan.jobplatform.jobseeker.repository.JobSeekerProfileRepository;
+import uz.imaan.jobplatform.telegram.handler.interfaces.JobSeekerHandler;
+
 
 import java.util.ArrayList;
 import java.util.List;
@@ -60,6 +62,7 @@ public class Telegram extends TelegramLongPollingBot {
         this.jobStore = jobStore;
         this.jobSeekerProfileRepository = jobSeekerProfileRepository;
         this.jobApplicationRepository = jobApplicationRepository;
+        log.info("✅ Telegram bot ishga tushdi!");
     }
 
     @Override
@@ -110,14 +113,10 @@ public class Telegram extends TelegramLongPollingBot {
                     String categoryKey = callbackData.replace("category_", "");
                     String categoryName = getCategoryName(categoryKey);
 
-                    // ✅ Barcha vakansiyalarni olish
+                    // Barcha vakansiyalarni olish
                     List<JobVacancy> allVacancies = jobStore.getAllVacancies();
 
-                    // ✅ Konsolga chiqarish (tekshirish uchun)
                     log.info("📋 Barcha vakansiyalar soni: {}", allVacancies.size());
-                    for (JobVacancy v : allVacancies) {
-                        log.info("   - {} | {}", v.getTitle(), v.getCategory());
-                    }
 
                     List<JobVacancy> vacancies;
                     if (categoryKey.equals("all")) {
@@ -141,10 +140,7 @@ public class Telegram extends TelegramLongPollingBot {
                         return;
                     }
 
-                    // ============================================
-                    // VAKANSIYALARNI KO'RSATISH (HAR BIRINI ALOHIDA)
-                    // ============================================
-                    // 1. Sarlavha xabari
+                    // VAKANSIYALARNI KO'RSATISH
                     String titleMsg = "💼 **Topilgan vakansiyalar (" + vacancies.size() + "):**";
                     SendMessage titleResponse = new SendMessage();
                     titleResponse.setChatId(chatId.toString());
@@ -152,7 +148,7 @@ public class Telegram extends TelegramLongPollingBot {
                     titleResponse.setParseMode("Markdown");
                     executeMessage(titleResponse);
 
-                    // 2. Har bir vakansiyani alohida xabar qilib yuborish
+                    // Har bir vakansiyani alohida xabar qilib yuborish
                     for (JobVacancy vacancy : vacancies) {
                         String vacancyText = String.format(
                                 "📌 **%s**\n" +
@@ -184,7 +180,7 @@ public class Telegram extends TelegramLongPollingBot {
                         executeMessage(vacancyResponse);
                     }
 
-                    // 3. Orqaga tugmasi
+                    // Orqaga tugmasi
                     InlineKeyboardMarkup backMarkup = new InlineKeyboardMarkup();
                     List<List<InlineKeyboardButton>> backRows = new ArrayList<>();
                     List<InlineKeyboardButton> backRow = new ArrayList<>();
