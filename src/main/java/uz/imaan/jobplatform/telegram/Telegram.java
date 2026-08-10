@@ -53,7 +53,7 @@ public class Telegram extends TelegramLongPollingBot {
             JobStore jobStore,
             JobSeekerProfileRepository jobSeekerProfileRepository,
             JobApplicationRepository jobApplicationRepository,
-            @Value("8449248126:AAFPgTpsBD2o1k_cp8YbG8_wqp9o8KnRCss") String botToken) {
+            @Value("${bot.token:8449248126:AAFPgTpsBD2o1k_cp8YbG8_wqp9o8KnRCss}") String botToken) {
         super(botToken);
         this.jobSeekerHandler = jobSeekerHandler;
         this.employerHandler = employerHandler;
@@ -104,21 +104,32 @@ public class Telegram extends TelegramLongPollingBot {
                 }
 
                 // ============================================
-                // KATEGORIYA TANLASH
+                // KATEGORIYA TANLASH (VAKANSIYALARNI KO'RSATISH)
                 // ============================================
                 if (callbackData.startsWith("category_")) {
                     String categoryKey = callbackData.replace("category_", "");
                     String categoryName = getCategoryName(categoryKey);
 
+                    // ✅ Barcha vakansiyalarni olish
+                    List<JobVacancy> allVacancies = jobStore.getAllVacancies();
+
+                    // ✅ Konsolga chiqarish (tekshirish uchun)
+                    log.info("📋 Barcha vakansiyalar soni: {}", allVacancies.size());
+                    for (JobVacancy v : allVacancies) {
+                        log.info("   - {} | {}", v.getTitle(), v.getCategory());
+                    }
+
                     List<JobVacancy> vacancies;
                     if (categoryKey.equals("all")) {
-                        vacancies = jobStore.getAllVacancies();
+                        vacancies = allVacancies;
                     } else {
-                        vacancies = jobStore.getAllVacancies().stream()
+                        vacancies = allVacancies.stream()
                                 .filter(v -> v.getCategory() != null &&
-                                        v.getCategory().contains(categoryName))
+                                        v.getCategory().toLowerCase().contains(categoryName.toLowerCase()))
                                 .toList();
                     }
+
+                    log.info("🔍 Kategoriya: {}, topilgan: {} ta", categoryName, vacancies.size());
 
                     if (vacancies == null || vacancies.isEmpty()) {
                         String msg = "🔍 Ushbu kategoriya bo'yicha hozircha vakansiyalar mavjud emas.";
@@ -130,17 +141,50 @@ public class Telegram extends TelegramLongPollingBot {
                         return;
                     }
 
-                    // Vakansiyalarni ko'rsatish
-                    StringBuilder result = new StringBuilder("💼 **Topilgan vakansiyalar (" + vacancies.size() + "):**\n\n");
-                    for (int i = 0; i < vacancies.size(); i++) {
-                        JobVacancy v = vacancies.get(i);
-                        result.append(i + 1).append(". 📌 **").append(v.getTitle()).append("**\n");
-                        result.append("   📂 Kategoriya: ").append(v.getCategory()).append("\n");
-                        result.append("   💰 Maosh: ").append(v.getSalary()).append("\n");
-                        result.append("───────────────\n");
+                    // ============================================
+                    // VAKANSIYALARNI KO'RSATISH (HAR BIRINI ALOHIDA)
+                    // ============================================
+                    // 1. Sarlavha xabari
+                    String titleMsg = "💼 **Topilgan vakansiyalar (" + vacancies.size() + "):**";
+                    SendMessage titleResponse = new SendMessage();
+                    titleResponse.setChatId(chatId.toString());
+                    titleResponse.setText(titleMsg);
+                    titleResponse.setParseMode("Markdown");
+                    executeMessage(titleResponse);
+
+                    // 2. Har bir vakansiyani alohida xabar qilib yuborish
+                    for (JobVacancy vacancy : vacancies) {
+                        String vacancyText = String.format(
+                                "📌 **%s**\n" +
+                                        "📂 Kategoriya: %s\n" +
+                                        "💼 Turi: %s\n" +
+                                        "💰 Maosh: %s",
+                                vacancy.getTitle(),
+                                vacancy.getCategory() != null ? vacancy.getCategory() : "Ko'rsatilmagan",
+                                vacancy.getType() != null ? vacancy.getType() : "Ko'rsatilmagan",
+                                vacancy.getSalary() != null ? vacancy.getSalary() : "Kelishilgan"
+                        );
+
+                        // "Ariza topshirish" tugmasi
+                        InlineKeyboardMarkup applyMarkup = new InlineKeyboardMarkup();
+                        List<List<InlineKeyboardButton>> applyRows = new ArrayList<>();
+                        List<InlineKeyboardButton> applyRow = new ArrayList<>();
+                        applyRow.add(InlineKeyboardButton.builder()
+                                .text("📝 Ariza topshirish")
+                                .callbackData("apply_" + vacancy.getId())
+                                .build());
+                        applyRows.add(applyRow);
+                        applyMarkup.setKeyboard(applyRows);
+
+                        SendMessage vacancyResponse = new SendMessage();
+                        vacancyResponse.setChatId(chatId.toString());
+                        vacancyResponse.setText(vacancyText);
+                        vacancyResponse.setParseMode("Markdown");
+                        vacancyResponse.setReplyMarkup(applyMarkup);
+                        executeMessage(vacancyResponse);
                     }
 
-                    // Orqaga tugmasi
+                    // 3. Orqaga tugmasi
                     InlineKeyboardMarkup backMarkup = new InlineKeyboardMarkup();
                     List<List<InlineKeyboardButton>> backRows = new ArrayList<>();
                     List<InlineKeyboardButton> backRow = new ArrayList<>();
@@ -151,12 +195,12 @@ public class Telegram extends TelegramLongPollingBot {
                     backRows.add(backRow);
                     backMarkup.setKeyboard(backRows);
 
-                    SendMessage response = new SendMessage();
-                    response.setChatId(chatId.toString());
-                    response.setText(result.toString());
-                    response.setParseMode("Markdown");
-                    response.setReplyMarkup(backMarkup);
-                    executeMessage(response);
+                    SendMessage backResponse = new SendMessage();
+                    backResponse.setChatId(chatId.toString());
+                    backResponse.setText("📂 **Boshqa kategoriyani tanlang:**");
+                    backResponse.setParseMode("Markdown");
+                    backResponse.setReplyMarkup(backMarkup);
+                    executeMessage(backResponse);
                     return;
                 }
 
@@ -174,7 +218,7 @@ public class Telegram extends TelegramLongPollingBot {
                 }
 
                 // ============================================
-                // ARIZA TOPSHIRISH (apply_123) 🆕
+                // ARIZA TOPSHIRISH (apply_123)
                 // ============================================
                 if (callbackData.startsWith("apply_")) {
                     Long vacancyId = Long.parseLong(callbackData.replace("apply_", ""));
