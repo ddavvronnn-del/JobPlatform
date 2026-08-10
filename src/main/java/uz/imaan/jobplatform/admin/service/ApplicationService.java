@@ -17,7 +17,7 @@ public class ApplicationService {
         this.adminBotService = adminBotService;
     }
 
-    public void createApplication(JobSeekerProfile jobSeeker, JobVacancy vacancy) {
+    /*public void createApplication(JobSeekerProfile jobSeeker, JobVacancy vacancy) {
         // 1. Формируем красивый текст уведомления
         String text = String.format(
                 "🔔 **Новая заявка на вакансию!**\n\n" +
@@ -30,6 +30,6 @@ public class ApplicationService {
         );
 
         // 2. Отправляем уведомление админу в Telegram
-        adminBotService.notifyAdmin(text);
-    }
+        TelegramBotService.notifyAdmin(text);
+    }*/
 }

@@ -1,5 +1,7 @@
 package uz.imaan.jobplatform.admin;
 
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.telegram.telegrambots.bots.TelegramLongPollingBot;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
@@ -19,7 +21,9 @@ import java.util.List;
 public class TelegramBotService extends TelegramLongPollingBot {
 
     private String botUsername = "jobplatform_admin_bot";
-    private final AdminService adminService;
+    @Lazy
+    @Autowired
+    private  AdminService adminService;
 
     public TelegramBotService(AdminService adminService) {
 //        super("8470148420:AAEcjcwI9sKspY94OFiB7V5gqmAjQvgVhPY");
@@ -186,7 +190,7 @@ public class TelegramBotService extends TelegramLongPollingBot {
                 .build();
     }
 
-    public void sendMessage(long chatId, String text) {
+    public  void sendMessage(long chatId, String text) {
         SendMessage message = SendMessage.builder()
                 .chatId(chatId)
                 .text(text)
@@ -213,7 +217,7 @@ public class TelegramBotService extends TelegramLongPollingBot {
 
     }
 
-    private void executeMessage(SendMessage message) {
+    private  void executeMessage(SendMessage message) {
         try {
             execute(message);
         } catch (TelegramApiException e) {
@@ -249,17 +253,5 @@ public class TelegramBotService extends TelegramLongPollingBot {
 
         executeMessage(sendMessage);
     }
-    public void notifyAdmin(String notificationText) {
-        Long adminTelegramId = 6326035618L ;
-        SendMessage message = SendMessage.builder()
-                .chatId(adminTelegramId.toString())
-                .text(notificationText)
-                .parseMode("Markdown")
-                .build();
-        try {
-            execute(message); // Здесь execute() работает, потому что класс наследует TelegramLongPollingBot
-        } catch (TelegramApiException e) {
-            e.printStackTrace();
-        }
-    }
+
 }

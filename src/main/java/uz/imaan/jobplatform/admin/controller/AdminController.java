@@ -69,5 +69,21 @@ public ResponseEntity<String> blockUser(@RequestBody AdminDTO blockDTO) {
 public ResponseEntity<String> unblockUser(@PathVariable Long userId) {
     adminService.unblockUser(userId);
     return ResponseEntity.ok("Пользователь успешно разблокирован");
-}}
+}
+    @Operation(
+            summary = "Получить подробную информацию об исполнителе",
+            description = "Возвращает отформатированную карточку профиля исполнителя по его ID"
+    )
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Информация о профиле успешно получена"),
+            @ApiResponse(responseCode = "404", description = "Исполнитель не найден")
+    })
+    @GetMapping("/workers/{userId}")
+    public ResponseEntity<String> getWorkerDetails(@PathVariable Long userId) {
+        // Вызываем метод из вашего сервиса (замените adminService на ваш сервис, где лежит метод)
+        String workerDetails = adminService.getWorkerDetails(userId);
+
+        return ResponseEntity.ok(workerDetails);
+    }
+}
 

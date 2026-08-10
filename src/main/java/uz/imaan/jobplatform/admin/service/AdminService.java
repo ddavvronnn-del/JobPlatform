@@ -2,7 +2,11 @@ package uz.imaan.jobplatform.admin.service;
 
 import jakarta.transaction.Transactional;
 import jakarta.validation.constraints.NotNull;
+import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
+import uz.imaan.jobplatform.admin.TelegramBotService;
 import uz.imaan.jobplatform.admin.entity.Admin;
 
 import uz.imaan.jobplatform.admin.dto.AdminDTO;
@@ -16,18 +20,15 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 
-
+@RequiredArgsConstructor
 @Service
 public class AdminService {
     private final AdminRepository adminRepository;
     private final AdminMapper adminMapper;
     private final JobSeekerProfileRepository jobSeekerProfileRepository;
-
-    public AdminService(AdminRepository adminRepository, AdminMapper adminMapper, JobSeekerProfileRepository jobSeekerProfileRepository) {
-        this.adminRepository = adminRepository;
-        this.adminMapper = adminMapper;
-        this.jobSeekerProfileRepository = jobSeekerProfileRepository;
-    }
+    @Lazy
+    @Autowired
+    private  TelegramBotService telegramBotService;
 
 
     public List<AdminDTO> getAllAdmins() {
@@ -103,19 +104,25 @@ public class AdminService {
                 .orElseThrow(() -> new RuntimeException("Исполнитель не найден с ID: " + userId));
 
         return String.format(
-                "👤 **Профиль исполнителя** (ID: %d)\n\n" +
+                "👤 **Профиль исполнителя** (ID: %d)\n" +
+                        "📛 **ФИО:** %s\n" +
+                        "📞 **Телефон:** %s\n\n" +
                         "📌 **Статус:** %s\n" +
                         "🔒 **Заблокирован:** %s\n" +
                         "💬 **Причина блокировки:** %s\n\n" +
                         "📊 **Характеристики:**\n" +
-                        "• Навыки / Опыт: %s\n" +
-                        "• Рейтинг: %.1f ⭐\n" +
-                        "• Выполнено смен: %d",
-                userId,
-                worker.getIsActive() ? "Активен ✅" : "Заблокирован ❌",
-                worker.getIsActive() ? "Нет" : "Да",
-                worker.getBlockReason() != null ? worker.getBlockReason() : "Нет",
-                worker.getRating() != null ? worker.getRating() : 0.0
+                        "• Профессия: %s\n" +
+                        "• Опыт: %s\n" +
+                        "• Рейтинг: %.1f ⭐",
+                userId,                                                                      // 1. %d
+                worker.getFullName() != null ? worker.getFullName() : "Не указано",           // 2. %s
+                worker.getPhoneNumber() != null ? worker.getPhoneNumber() : "Не указан",       // 3. %s
+                Boolean.TRUE.equals(worker.getIsActive()) ? "Активен ✅" : "Заблокирован ❌", // 4. %s
+                Boolean.TRUE.equals(worker.getIsActive()) ? "Нет" : "Да",                    // 5. %s
+                worker.getBlockReason() != null ? worker.getBlockReason() : "Нет",           // 6. %s
+                worker.getProfession() != null ? worker.getProfession() : "Не указана",     // 7. %s
+                worker.getExperience() != null ? worker.getExperience() : "Не указан",       // 8. %s
+                worker.getRating() != null ? worker.getRating() : 0.0                       // 9. %.1f
         );
     }
 
@@ -138,8 +145,10 @@ public class AdminService {
             System.out.println("ℹ️ Админ уже есть в базе.");
         }
     }
-
-
+    public void notifyAdmin(String message) {
+        Long adminChatId = 6326035618L;
+        telegramBotService.sendMessage(adminChatId, message); // ✅ Через внедрённый ОБЪЕКТ
+    }
 }
 
 
