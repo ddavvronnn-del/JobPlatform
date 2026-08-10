@@ -119,8 +119,25 @@ public class AdminService {
         );
     }
 
+    // Этот метод запустится один раз при старте приложения
+    @jakarta.annotation.PostConstruct
+    public void init() {
+        long myRealId = 6326035618L ; // ВАШ ID ИЗ ЛОГОВ
 
-    // Метод для отправки уведомления админу из любых других сервисов
+        // Проверяем, есть ли вы в базе
+        if (!adminRepository.existsByTelegramId(myRealId)) {
+            // Если нет - создаем вас принудительно
+            Admin newAdmin = new Admin();
+            newAdmin.setTelegramId(myRealId);
+            newAdmin.setName("Главный Админ");
+            newAdmin.setRole("ADMIN");
+
+            adminRepository.save(newAdmin);
+            System.out.println("✅ АДМИН УСПЕШНО ДОБАВЛЕН В БАЗУ ДАННЫХ!");
+        } else {
+            System.out.println("ℹ️ Админ уже есть в базе.");
+        }
+    }
 
 
 }

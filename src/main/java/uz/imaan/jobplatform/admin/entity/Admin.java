@@ -11,9 +11,9 @@ import lombok.Setter;
 public class Admin {
 
 
+    private String name;
 
-
-        // Геттеры и сеттеры (обязательно должны быть!)
+    // Геттеры и сеттеры (обязательно должны быть!)
         public Long getTelegramId() { return telegramId; }
         public void setTelegramId(Long telegramId) { this.telegramId = telegramId; }
         // ... остальные геттеры/сеттеры
@@ -26,4 +26,12 @@ public class Admin {
     private String username;
     private String role; // e.g. "ROLE_ADMIN", "SUPER_ADMIN"
     private Boolean isActive;
+
+    public void setName(String name) {
+        this.name = name;
+    }
+
+    public String getName() {
+        return name;
+    }
 }

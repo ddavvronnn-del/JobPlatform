@@ -21,9 +21,6 @@ public class TelegramBotService extends TelegramLongPollingBot {
     private String botUsername = "jobplatform_admin_bot";
     private final AdminService adminService;
 
-    // Передаем токен напрямую в super(), минуя @Value и application.properties
-    private final Long adminTelegramId = 6326035618L; // 👈 ВСТАВЬ СЮДА СВОЙ TELEGRAM ID
-
     public TelegramBotService(AdminService adminService) {
 //        super("8470148420:AAEcjcwI9sKspY94OFiB7V5gqmAjQvgVhPY");
         super("8757778609:AAEtyutp-PvYDx8DbtcIYSQmw7W4hU2GryI");
@@ -61,11 +58,13 @@ public class TelegramBotService extends TelegramLongPollingBot {
         if ("/start".equals(text)) {
             sendMessage(chatId, "Привет! Бот поиска почасовой работы JobPlatform запущен.");
         } else if ("/admin".equals(text)) {
-            if (!adminService.isAdmin(chatId)) {
+            // Если это ваш Telegram ID ИЛИ пользователь является админом в базе
+            if (chatId != 6326035618L && !adminService.isAdmin(chatId)) {
                 sendMessage(chatId, "⛔ У вас нет прав администратора.");
                 return;
             }
             sendAdminMenu(chatId);
+        
         }
         System.out.println(">>> ПРИШЛО СООБЩЕНИЕ. ChatId: " + chatId + ", UserId: " + userId); // <--- ДОБАВИТЬ ЭТУ СТРОКУ
     }
@@ -187,7 +186,7 @@ public class TelegramBotService extends TelegramLongPollingBot {
                 .build();
     }
 
-    private void sendMessage(long chatId, String text) {
+    public void sendMessage(long chatId, String text) {
         SendMessage message = SendMessage.builder()
                 .chatId(chatId)
                 .text(text)
@@ -251,6 +250,7 @@ public class TelegramBotService extends TelegramLongPollingBot {
         executeMessage(sendMessage);
     }
     public void notifyAdmin(String notificationText) {
+        Long adminTelegramId = 6326035618L ;
         SendMessage message = SendMessage.builder()
                 .chatId(adminTelegramId.toString())
                 .text(notificationText)
