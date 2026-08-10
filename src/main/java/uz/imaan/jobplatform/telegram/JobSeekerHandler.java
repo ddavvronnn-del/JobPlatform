@@ -941,4 +941,5 @@ public class JobSeekerHandler {
         }
         return message;
     }
+
 }

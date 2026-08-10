@@ -38,4 +38,13 @@ public class EmployerEntity {
     private Boolean foodProvided;
     private Double latitude;
     private Double longitude;
+    private String language;
+
+    public void setLanguage(String language) {
+        this.language = language;
+    }
+
+    public String getLanguage() {
+        return language;
+    }
 }
