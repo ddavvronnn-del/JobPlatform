@@ -1,10 +1,9 @@
-package uz.imaan.jobplatform.telegram.handler.impl;
+package uz.imaan.jobplatform.telegram.JobSeekerHandler.impl;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationContext;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Transactional;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
 import org.telegram.telegrambots.meta.api.objects.Message;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
@@ -22,9 +21,8 @@ import uz.imaan.jobplatform.jobseeker.repository.JobApplicationRepository;
 import uz.imaan.jobplatform.jobseeker.repository.JobSeekerProfileRepository;
 import uz.imaan.jobplatform.jobseeker.service.interfaces.WalletService;
 import uz.imaan.jobplatform.telegram.Telegram;
-import uz.imaan.jobplatform.telegram.handler.interfaces.JobSeekerHandler;
+import uz.imaan.jobplatform.telegram.JobSeekerHandler.interfaces.JobSeekerHandler;
 
-import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -1187,7 +1185,7 @@ public class JobSeekerHandlerImpl implements JobSeekerHandler {
             jobTypeDisplay = "👨‍💻 " + profile.getProfession();
         }
 
-        // ✅ KARTALARNI OLISH (YULDUZCHALAR BILAN)
+        // ✅ KARTALARNI OLISH (TO'LIQ RAQAM)
         String cardDisplay = "❌ Karta mavjud emas";
         try {
             if (profile.getBankCards() != null) {
@@ -1199,9 +1197,9 @@ public class JobSeekerHandlerImpl implements JobSeekerHandler {
                             .orElse(bankCards.get(0));
 
                     String cardNumber = activeCard.getCardNumber();
-                    if (cardNumber != null && cardNumber.length() >= 4) {
-                        String lastFour = cardNumber.substring(cardNumber.length() - 4);
-                        cardDisplay = "**** **** **** " + lastFour;
+                    if (cardNumber != null && !cardNumber.isEmpty()) {
+                        // ✅ TO'LIQ KARTA RAQAMI (yulduzcha YO'Q)
+                        cardDisplay = cardNumber;
                     }
                     if (bankCards.size() > 1) {
                         cardDisplay += " (+" + (bankCards.size() - 1) + " ta karta)";
@@ -1447,6 +1445,7 @@ public class JobSeekerHandlerImpl implements JobSeekerHandler {
 
 
 
+
     @Override
     public SendMessage showWallet(Long chatId, Optional<JobSeekerProfile> profileOpt) {
         try {
@@ -1477,9 +1476,9 @@ public class JobSeekerHandlerImpl implements JobSeekerHandler {
                 String cardNumber = activeCard.getCardNumber();
                 String cardHolderName = activeCard.getCardHolderName();
 
-                // ✅ TO'LIQ KARTA RAQAMI (yulduzcha YO'Q)
+                // ✅ TO'LIQ KARTA RAQAMI
                 if (cardNumber != null && !cardNumber.isEmpty()) {
-                    cardNumberDisplay = cardNumber;  // To'liq raqam
+                    cardNumberDisplay = cardNumber;
                 }
 
                 // ✅ KARTA EGASI
@@ -1492,7 +1491,6 @@ public class JobSeekerHandlerImpl implements JobSeekerHandler {
                 }
             }
 
-            // ✅ HAMYON MATNI (TO'LIQ RAQAM + EGASI ALOHIDA)
             String msg = getText(profileOpt,
                     "💳 **Кошелек и платежи:**\n\n" +
                             "💰 **Баланс:** " + balance + " сум\n" +

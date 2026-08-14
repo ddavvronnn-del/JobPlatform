@@ -1,4 +1,4 @@
-package uz.imaan.jobplatform.telegram.handler.interfaces;
+package uz.imaan.jobplatform.telegram.JobSeekerHandler.interfaces;
 
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
 import org.telegram.telegrambots.meta.api.objects.Message;
