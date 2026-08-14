@@ -28,6 +28,10 @@ import lombok.NoArgsConstructor;
         private String reason;
         private String Email;
         private String Password;
+    // 🔴 ДОБАВЬ ЭТИ ТРИ ПОЛЯ:
+    private long totalVacancies;
+    private long activeShifts;
+    private long completedShifts;
 
 
     }
