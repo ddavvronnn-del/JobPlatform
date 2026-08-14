@@ -18,17 +18,20 @@ public class EmployerEntity {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
-    private String companyName;
+
+    @Column(unique = true, nullable = false)
     private Long employerChatId;
+
     private String fullName;
     private String title;
     private String category;
     private String jobType;
-    private String salary;         // <-- String bo'lishi kerak
-    private String workHours;      // <-- String bo'lishi kerak
+    private String salary;         // String formatida
+    private String workHours;      // String formatida
     private String requirements;
     private String status;
     private LocalDateTime createdAt;
+
     private String inn;
     private String passportSeriesNumber;
     private String phoneNumber;
@@ -38,12 +41,5 @@ public class EmployerEntity {
     private Double latitude;
     private Double longitude;
     private String language;
-
-    public void setLanguage(String language) {
-        this.language = language;
-    }
-
-    public String getLanguage() {
-        return language;
-    }
+    private String companyName;    // To'g'ri camelCase formatda
 }

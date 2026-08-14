@@ -16,12 +16,19 @@ import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 import uz.imaan.jobplatform.admin.dto.AdminDTO;
 import uz.imaan.jobplatform.admin.service.AdminService;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 @Service
 public class TelegramBotService extends TelegramLongPollingBot {
+    // Хранение языка для каждого пользователя (chatId -> "RU" или "UZ")
+    private final Map<Long, String> userLanguages = new ConcurrentHashMap<>();
+
+    private String getLanguage(long chatId) {
+        return userLanguages.getOrDefault(chatId, "RU"); // По умолчанию Русский
+    }
 
     private final Map<Long, String> userStates = new ConcurrentHashMap<>();
     private final Map<Long, AdminDTO> pendingAdmins = new ConcurrentHashMap<>();
@@ -47,135 +54,117 @@ public class TelegramBotService extends TelegramLongPollingBot {
 
     @Override
     public void onUpdateReceived(Update update) {
-        if (!update.hasMessage() || !update.getMessage().hasText()) return;
-
-        String text = update.getMessage().getText();
-        long chatId = update.getMessage().getChatId();
-        String state = userStates.getOrDefault(chatId, "IDLE");
-
-        // 1. Старт создания
-        if (text.equalsIgnoreCase("/newadmin")) {
-            userStates.put(chatId, "WAITING_USERNAME");
-            pendingAdmins.put(chatId, new AdminDTO());
-            sendMessage(chatId, "Введите **Username** для нового админа:");
-            return;
-        }
-
-        // 2. Ввод Username
-        if ("WAITING_USERNAME".equals(state)) {
-            pendingAdmins.get(chatId).setUsername(text);
-            userStates.put(chatId, "WAITING_EMAIL");
-            sendMessage(chatId, "Отлично! Теперь введите **Email**:");
-            return;
-        }
-
-        // 3. Ввод Email
-        if ("WAITING_EMAIL".equals(state)) {
-            pendingAdmins.get(chatId).setEmail(text);
-            userStates.put(chatId, "WAITING_PASSWORD");
-            sendMessage(chatId, "Теперь введите **Пароль**:");
-            return;
-        }
-
-        // 4. Ввод Пароля и финализация
-        if ("WAITING_PASSWORD".equals(state)) {
-            AdminDTO dto = pendingAdmins.get(chatId);
-            dto.setPassword(text);
-
-            try {
-                adminService.createAdmin(dto);
-                sendMessage(chatId, "🎉 Администратор **" + dto.getUsername() + "** успешно добавлен!");
-            } catch (Exception e) {
-                sendMessage(chatId, "❌ Не удалось создать админа: " + e.getMessage());
-            } finally {
-                // Очищаем состояние
-                userStates.remove(chatId);
-                pendingAdmins.remove(chatId);
-            }
-        }
         try {
+            // Обработка текстовых сообщений
             if (update.hasMessage() && update.getMessage().hasText()) {
-                handleTextMessage(update.getMessage());
-            } else if (update.hasCallbackQuery()) {
-                handleCallbackQuery(update.getCallbackQuery());
-            }
-        } catch (Exception e) {
-            System.err.println("❌ Ошибка при обработке сообщения от Telegram:");
-            e.printStackTrace();
-        }
+                Message message = update.getMessage();
+                long chatId = message.getChatId();
 
+                // ИГНОРИРУЕМ ПОВТОРНЫЕ ОБНОВЛЕНИЯ
+                if (lastUpdateId >= update.getUpdateId()) {
+                    return;
+                }
+                lastUpdateId = update.getUpdateId();
 
-    }
-
-    private void handleTextMessage(Message message) {
-        long chatId = message.getChatId();
-        long userId = message.getFrom().getId();
-        String messageText = message.getText();
-
-        if (messageText == null) return;
-
-        // Логирование входящих сообщений
-        System.out.println(">>> ПРИШЛО СООБЩЕНИЕ. ChatId: " + chatId + ", UserId: " + userId + ", Text: " + messageText);
-
-        // 👨‍🔧 Просмотр рабочих
-        if (messageText.equals("👨‍🔧 Рабочие") || messageText.equals("👷 Рабочие") || messageText.equals("/workers")) {
-            String responseText = adminService.getFormattedJobSeekersList();
-            sendMessage(chatId, responseText);
-            return;
-        }
-        // 💼 Просмотр работодателей
-        else if (messageText.equals("💼 Работодатели") || messageText.equals("/employers")) {
-            String responseText = adminService.getFormattedEmployersList();
-            sendMessage(chatId, responseText);
-            return;
-        }
-
-        // Команда /start
-        if ("/start".equals(messageText)) {
-            sendMessage(chatId, "Привет! Бот поиска почасовой работы JobPlatform запущен.");
-        }
-        // Команда /admin
-        else if ("/admin".equals(messageText)) {
-            if (chatId != 6326035618L && !adminService.isAdmin(chatId)) {
-                sendMessage(chatId, "⛔ У вас нет прав администратора.");
+                handleTextMessage(message);
                 return;
             }
-            sendAdminMenu(chatId);
+
+            // Обработка нажатий на кнопки
+            if (update.hasCallbackQuery()) {
+                handleCallbackQuery(update.getCallbackQuery());
+                return;
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
         }
+    }
+
+    // Добавь это поле в класс:
+    private long lastUpdateId = 0;
+
+    private void handleTextMessage(Message message) {
+        String text = message.getText();
+        long chatId = message.getChatId();
+
+        if (text == null) return;
+
+        // ===== ОБРАБОТКА КОМАНД =====
+        if (text.startsWith("/")) {
+
+            // 1. КОМАНДА /START - ТОЛЬКО ОДИН РАЗ!
+            if ("/start".equals(text)) {
+                // Проверяем, есть ли уже приветствие
+                if (!userLanguages.containsKey(chatId)) {
+                    userLanguages.put(chatId, "RU"); // Язык по умолчанию
+                }
+                sendMessage(chatId, "Привет! Бот поиска почасовой работы JobPlatform запущен.");
+                return; // ВАЖНО: ВЫХОДИМ!
+            }
+
+            // 2. КОМАНДА /ADMIN - ТОЛЬКО ОДИН РАЗ!
+            if ("/admin".equals(text)) {
+                if (chatId != 6326035618L) {
+                    sendMessage(chatId, "У вас нет прав администратора.");
+                    return;
+                }
+                sendAdminMenu(chatId);
+                return; // ВАЖНО: ВЫХОДИМ!
+            }
+        }
+
+        // Если это не команда - просто игнорируем
+        System.out.println("Игнорируем текст: " + text);
     }
 
     private void handleCallbackQuery(CallbackQuery callbackQuery) {
-        long userId = callbackQuery.getFrom().getId();
         long chatId = callbackQuery.getMessage().getChatId();
         String data = callbackQuery.getData();
 
-        // 1. ВЫВОДИМ В КОНСОЛЬ IDE — доходит ли клик
-        System.out.println(">>> НАЖАТА ИНЛАЙН-КНОПКА! Data: [" + data + "], UserId: " + userId);
-
-        // 2. Гасим часики на кнопке
+        // Гасим часики на кнопке
         try {
             AnswerCallbackQuery answer = new AnswerCallbackQuery();
             answer.setCallbackQueryId(callbackQuery.getId());
             execute(answer);
-        } catch (Exception e) {
-            System.err.println("Ошибка при гашении часиков: " + e.getMessage());
+        } catch (Exception ignored) {}
+
+        // 🌐 1. Нажали "Сменить язык"
+        if ("change_language".equals(data)) {
+            sendLanguageMenu(chatId);
         }
-
-        // 3. Отправляем простой ответ БЕЗ Markdown (чтобы исключить ошибки форматирования)
-        try {
+        // 🇷🇺 2. Выбрали Русский
+        else if ("lang_ru".equals(data)) {
+            userLanguages.put(chatId, "RU");
+            sendMessage(chatId, "✅ Язык успешно изменён на **Русский**!");
+            sendAdminMenu(chatId); // Показываем меню на русском
+        }
+        // 🇺🇿 3. Выбрали Узбекский
+        else if ("lang_uz".equals(data)) {
+            userLanguages.put(chatId, "UZ");
+            sendMessage(chatId, "✅ Til **O'zbekcha**ga muvaffaqiyatli o'zgartirildi!");
+            sendAdminMenu(chatId); // Показываем меню на узбекском
+        }
+        // 📊 4. Статистика
+        else if ("admin_stats".equals(data) || "stats".equals(data)) {
             AdminDTO stats = adminService.getStats();
+            String lang = getLanguage(chatId);
 
-            String simpleText = "Статистика платформы:\n" +
-                    "Админов: " + stats.getTotalAdmins() + "\n" +
-                    "Работодателей: " + stats.getTotalEmployers() + "\n" +
-                    "Исполнителей: " + stats.getTotalWorkers();
+            String statsText = "UZ".equals(lang) ?
+                    String.format("📊 *Platforma statistikasi:*\n\n👥 Adminlar: `%d`\n🏢 Ish beruvchilar: `%d`\n👤 Ishchilar: `%d`",
+                            stats.getTotalAdmins(), stats.getTotalEmployers(), stats.getTotalWorkers()) :
+                    String.format("📊 *Статистика платформы:*\n\n👥 Админов: `%d`\n🏢 Работодателей: `%d`\n👤 Исполнителей: `%d`",
+                            stats.getTotalAdmins(), stats.getTotalEmployers(), stats.getTotalWorkers());
 
-            sendMessage(chatId, simpleText);
+            sendMessage(chatId, statsText);
+        }
+        // 👷 5. Рабочие
+        else if ("admin_workers".equals(data) || "workers".equals(data)) {
+            sendMessage(chatId, adminService.getFormattedJobSeekersList());
+        }
+        // 🏢 6. Работодатели
+        else if ("admin_employers".equals(data) || "employers".equals(data)) {
+            sendMessage(chatId, adminService.getFormattedEmployersList());
 
-        } catch (Exception e) {
-            System.err.println("❌ Ошибка при выполнении getStats():");
-            e.printStackTrace();
-            sendMessage(chatId, "❌ Произошла ошибка на сервере при получении статистики.");
         }
     }
 
@@ -242,26 +231,54 @@ public class TelegramBotService extends TelegramLongPollingBot {
         }
     }
 
-    private void sendAdminMenu(long chatId) {
-        SendMessage message = SendMessage.builder()
-                .chatId(chatId)
-                .text("⚙️ *Панель администратора JobPlatform*\nВыберите действие:")
-                .parseMode("Markdown")
-                .replyMarkup(getAdminKeyboard())
-                .build();
-        executeMessage(message);
+    public void sendAdminMenu(long chatId) {
+        String lang = getLanguage(chatId);
+
+        SendMessage message = new SendMessage();
+        message.setChatId(String.valueOf(chatId));
+        message.setText("UZ".equals(lang)
+                ? "⚙️ **JobPlatform Admin Paneli**\nBo'limni tanlang:"
+                : "⚙️ **Панель администратора JobPlatform**\nВыберите действие:");
+
+        InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
+        List<List<InlineKeyboardButton>> rows = new ArrayList<>();
+
+        // 1. Статистика
+        InlineKeyboardButton statsBtn = new InlineKeyboardButton();
+        statsBtn.setText("UZ".equals(lang) ? "📊 Platforma statistikasi" : "📊 Статистика платформы");
+        statsBtn.setCallbackData("admin_stats");
+
+        // 2. Рабочие
+        InlineKeyboardButton workersBtn = new InlineKeyboardButton();
+        workersBtn.setText("UZ".equals(lang) ? "👷 Ishchilar" : "👷 Рабочие");
+        workersBtn.setCallbackData("admin_workers");
+
+        // 3. Работодатели
+        InlineKeyboardButton employersBtn = new InlineKeyboardButton();
+        employersBtn.setText("UZ".equals(lang) ? "🏢 Ish beruvchilar" : "🏢 Работодатели");
+        employersBtn.setCallbackData("admin_employers");
+
+        // 4. 🌐 КНОПКА СМЕНЫ ЯЗЫКА
+        InlineKeyboardButton langBtn = new InlineKeyboardButton();
+        langBtn.setText("🌐 Сменить язык / Tilni o'zgartirish");
+        langBtn.setCallbackData("change_language");
+
+        // Сетка кнопок
+        rows.add(List.of(statsBtn));
+        rows.add(List.of(workersBtn, employersBtn));
+        rows.add(List.of(langBtn)); // 👈 Отдельный ряд для смены языка
+
+        markup.setKeyboard(rows);
+        message.setReplyMarkup(markup);
+        message.setParseMode("Markdown");
+
+        try {
+            execute(message);
+        } catch (TelegramApiException e) {
+            e.printStackTrace();
+        }
     }
 
-    private InlineKeyboardMarkup getAdminKeyboard() {
-        InlineKeyboardButton statsBtn = InlineKeyboardButton.builder()
-                .text("📊 Статистика платформы")
-                .callbackData("admin_stats")
-                .build();
-
-        return InlineKeyboardMarkup.builder()
-                .keyboardRow(List.of(statsBtn))
-                .build();
-    }
 
     public  void sendMessage(long chatId, String text) {
         SendMessage message = SendMessage.builder()
@@ -327,7 +344,32 @@ public class TelegramBotService extends TelegramLongPollingBot {
         executeMessage(sendMessage);
     }
 
-    // Пример обработки команд/кнопок в боте:
+    private void sendLanguageMenu(long chatId) {
+        SendMessage message = new SendMessage();
+        message.setChatId(String.valueOf(chatId));
+        message.setText("🌐 **Выберите язык / Tilni tanlang:**");
 
+        InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
+        List<List<InlineKeyboardButton>> rows = new ArrayList<>();
+
+        InlineKeyboardButton ruBtn = new InlineKeyboardButton();
+        ruBtn.setText("🇷🇺 Русский");
+        ruBtn.setCallbackData("lang_ru");
+
+        InlineKeyboardButton uzBtn = new InlineKeyboardButton();
+        uzBtn.setText("🇺🇿 O'zbekcha");
+        uzBtn.setCallbackData("lang_uz");
+
+        rows.add(List.of(ruBtn, uzBtn));
+        markup.setKeyboard(rows);
+        message.setReplyMarkup(markup);
+        message.setParseMode("Markdown");
+
+        try {
+            execute(message);
+        } catch (TelegramApiException e) {
+            e.printStackTrace();
+        }
+    }
 
 }

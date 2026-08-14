@@ -2,14 +2,16 @@ package uz.imaan.jobplatform.employer.job;
 
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-@Entity
-@Table(name = "job_vacancies")
 @Data
+@Entity
+@Builder
 @NoArgsConstructor
 @AllArgsConstructor
+@Table(name = "job_vacancies")
 public class JobVacancy {
 
     @Id
@@ -19,14 +21,11 @@ public class JobVacancy {
     private Long employerChatId;
     private String title;
     private String category;
-    private String type;
+    private String type;           // setType() uchun
     private String salary;
-
-    public JobVacancy(Long employerChatId, String title, String category, String type, String salary) {
-        this.employerChatId = employerChatId;
-        this.title = title;
-        this.category = category;
-        this.type = type;
-        this.salary = salary;
-    }
+    private String workHours;      // setWorkHours() uchun
+    private Integer workerCount;   // setWorkerCount() uchun
+    private String requirements;   // setRequirements() uchun
+    private String phoneNumber;    // setPhoneNumber() uchun
+    private Boolean isActive;
 }

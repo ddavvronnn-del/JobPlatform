@@ -1,5 +1,7 @@
 package uz.imaan.jobplatform.employer.dto;
 
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Positive;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -15,7 +17,9 @@ public class EmployerUpdateDTO {
 
     private String category;
     private String jobType;
+    @NotBlank
     private Double salary;
+    @Positive
     private Integer workHours;
     private LocalDate jobDate;
     private Integer workerCount;
