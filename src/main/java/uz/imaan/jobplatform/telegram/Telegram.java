@@ -12,7 +12,6 @@ import org.telegram.telegrambots.meta.api.objects.Update;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.ReplyKeyboardMarkup;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardButton;
-import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.KeyboardButton;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.KeyboardRow;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 import uz.imaan.jobplatform.employer.job.JobStore;
@@ -22,7 +21,6 @@ import uz.imaan.jobplatform.jobseeker.entity.JobSeekerProfile;
 import uz.imaan.jobplatform.jobseeker.repository.JobApplicationRepository;
 import uz.imaan.jobplatform.jobseeker.repository.JobSeekerProfileRepository;
 import uz.imaan.jobplatform.telegram.JobSeekerHandler.interfaces.JobSeekerHandler;
-
 
 import java.util.ArrayList;
 import java.util.List;
@@ -91,6 +89,9 @@ public class Telegram extends TelegramLongPollingBot {
                     String language = callbackData.replace("lang_", "");
                     jobSeekerHandler.updateLanguage(chatId, language);
 
+                    // ✅ Yangilangan profilni olish
+                    Optional<JobSeekerProfile> updatedProfile = jobSeekerProfileRepository.findByUserId(chatId);
+
                     String responseText = switch (language) {
                         case "uz" -> "✅ Til O'zbek tiliga o'zgartirildi!";
                         case "ru" -> "✅ Язык изменен на Русский!";
@@ -98,10 +99,11 @@ public class Telegram extends TelegramLongPollingBot {
                         default -> "❌ Noto'g'ri tanlov!";
                     };
 
+                    // ✅ Til tanlangandan keyin rol tanlash menyusi chiqadi
                     SendMessage response = new SendMessage();
                     response.setChatId(chatId.toString());
-                    response.setText(responseText);
-                    response.setReplyMarkup(null);
+                    response.setText(responseText + "\n\n" + "Hush kelibsiz! Rolingizni tanlang:");
+                    response.setReplyMarkup(getRoleSelectionKeyboard(updatedProfile));
                     executeMessage(response);
                     return;
                 }
@@ -299,10 +301,14 @@ public class Telegram extends TelegramLongPollingBot {
 
         log.info("📩 Xabar: chatId={}, text={}", chatId, text);
 
-        // /start yoki "🔄 Rolni o'zgartirish"
+        // ============================================
+        // /start yoki "🔄 Rolni o'zgartirish" ✅ TIL TANLASH BILAN
+        // ============================================
         if (text.equals("/start") || text.equals("🔄 Rolni o'zgartirish") || text.equals("Asosiy menyu")) {
             userRoles.put(chatId, UserRole.NONE);
-            sendRoleSelectionMenu(chatId, "Hush kelibsiz! Rolingizni tanlang:");
+
+            // ✅ TIL TANLASH MENYUSI
+            sendLanguageSelectionMenu(chatId);
             return;
         }
 
@@ -329,8 +335,46 @@ public class Telegram extends TelegramLongPollingBot {
             SendMessage response = jobSeekerHandler.handleJobSeeker(message);
             if (response != null) executeMessage(response);
         } else {
-            sendRoleSelectionMenu(chatId, "Iltimos, avval rolingizni tanlang:");
+            // ✅ Agar rol tanlanmagan bo'lsa, til tanlash menyusi
+            sendLanguageSelectionMenu(chatId);
         }
+    }
+
+    // ============================================
+    // ROL TANLASH KEYBOARD (TILGA QARAB) 🆕
+    // ============================================
+    private ReplyKeyboardMarkup getRoleSelectionKeyboard(Optional<JobSeekerProfile> profileOpt) {
+        ReplyKeyboardMarkup markup = new ReplyKeyboardMarkup();
+        markup.setResizeKeyboard(true);
+
+        KeyboardRow row = new KeyboardRow();
+
+        if (isRussian(profileOpt)) {
+            row.add("Работодатель");
+            row.add("Соискатель");
+        } else if (isEnglish(profileOpt)) {
+            row.add("Employer");
+            row.add("Job Seeker");
+        } else {
+            row.add("Employer (Ish beruvchi)");
+            row.add("JobSeeker (Ish izlovchi)");
+        }
+
+        markup.setKeyboard(List.of(row));
+        return markup;
+    }
+
+    // ============================================
+    // TILNI TEKSHIRISH 🆕
+    // ============================================
+    private boolean isRussian(Optional<JobSeekerProfile> profileOpt) {
+        if (profileOpt == null || !profileOpt.isPresent()) return false;
+        return "ru".equals(profileOpt.get().getLanguage());
+    }
+
+    private boolean isEnglish(Optional<JobSeekerProfile> profileOpt) {
+        if (profileOpt == null || !profileOpt.isPresent()) return false;
+        return "en".equals(profileOpt.get().getLanguage());
     }
 
     // ============================================
@@ -338,18 +382,7 @@ public class Telegram extends TelegramLongPollingBot {
     // ============================================
     private void sendRoleSelectionMenu(Long chatId, String text) {
         SendMessage message = new SendMessage(chatId.toString(), text);
-        ReplyKeyboardMarkup keyboardMarkup = new ReplyKeyboardMarkup();
-        keyboardMarkup.setResizeKeyboard(true);
-
-        List<KeyboardRow> keyboard = new ArrayList<>();
-        KeyboardRow row = new KeyboardRow();
-        row.add(new KeyboardButton("Employer (Ish beruvchi)"));
-        row.add(new KeyboardButton("JobSeeker (Ish izlovchi)"));
-
-        keyboard.add(row);
-        keyboardMarkup.setKeyboard(keyboard);
-        message.setReplyMarkup(keyboardMarkup);
-
+        message.setReplyMarkup(getRoleSelectionKeyboard(Optional.empty()));
         executeMessage(message);
     }
 
@@ -359,7 +392,9 @@ public class Telegram extends TelegramLongPollingBot {
     private void sendLanguageSelectionMenu(Long chatId) {
         SendMessage message = new SendMessage();
         message.setChatId(chatId.toString());
-        message.setText("🌐 **Tilni tanlang / Выберите язык:**");
+        message.setText("🌐 **Xush kelibsiz! Iltimos, tilni tanlang:**\n\n" +
+                "🌐 **Добро пожаловать! Пожалуйста, выберите язык:**\n\n" +
+                "🌐 **Welcome! Please choose your language:**");
         message.setParseMode("Markdown");
         message.setReplyMarkup(getLanguageInlineKeyboard());
         executeMessage(message);

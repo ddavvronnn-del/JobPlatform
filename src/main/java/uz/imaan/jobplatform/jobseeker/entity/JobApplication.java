@@ -1,6 +1,9 @@
 package uz.imaan.jobplatform.jobseeker.entity;
 
 import jakarta.persistence.*;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
 import lombok.*;
 
 import java.time.LocalDateTime;
@@ -19,15 +22,19 @@ public class JobApplication {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @NotNull(message = "Vakansiya ID si kiritilishi shart")
     @Column(name = "job_id", nullable = false)
     private Long jobId;
 
+    @NotNull(message = "Ish izlovchi ID si kiritilishi shart")
     @Column(name = "job_seeker_id", nullable = false)
     private Long jobSeekerId;
 
+    @Size(max = 1000, message = "Cover letter 1000 belgidan oshmasligi kerak  ")
     @Column(name = "cover_letter", length = 1000)
     private String coverLetter;
 
+    @NotNull(message = "Ariza holati kiritilishi shart")
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private ApplicationStatus status;
