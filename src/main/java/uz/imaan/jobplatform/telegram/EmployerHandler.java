@@ -292,8 +292,8 @@ public class EmployerHandler {
                     || text.toLowerCase().contains("ish beruvchi") || text.toLowerCase().contains("employer")) {
                 states.put(chatId, EmployerState.WAITING_FOR_REG_FULL_NAME);
                 return createMessage(chatId, getText(lang,
-                        "👤 **Ish beruvchi sifatida ro'yxatdan o'tish:**\n\nIltimos, ism va familiyangizni kiriting.\n💡 *Misol:* Aliyev Valijon",
-                        "👤 **Регистрация в качестве работодателя:**\n\nПожалуйста, введите ваше имя и фамилию.\n💡 *Пример:* Алиев Валижон"));
+                        "👤 **Ish beruvchi sifatida ro'yxatdan o'tish:**\n\nIltimos, ism va familiyangizni kiriting.\n💡 *Misol:* Shoxrux Sultanbayev",
+                        "👤 **Регистрация в качестве работодателя:**\n\nПожалуйста, введите ваше имя и фамилию.\n💡 *Пример:* Шохрух Султанбаев"));
             }
             draftData.get(chatId).put("reg_fio", text);
             states.put(chatId, EmployerState.WAITING_FOR_REG_AGE);
