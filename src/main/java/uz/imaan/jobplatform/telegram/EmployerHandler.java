@@ -45,6 +45,21 @@ public class EmployerHandler {
         String lang = profileOpt.map(EmployerEntity::getLanguage).orElse("uz");
 
         // ============================================
+        // 0. AGAR PROFIL YO'Q YOKI ESKICHA "EMPLOYER" BO'LSA
+        // ============================================
+        boolean isRegistrationNeeded = profileOpt.isEmpty() ||
+                profileOpt.get().getFullName() == null ||
+                profileOpt.get().getFullName().isBlank() ||
+                profileOpt.get().getFullName().toLowerCase().contains("employer");
+
+        if (isRegistrationNeeded) {
+            if (text.equals("🏠 Asosiy menyu") || text.equals("🏠 Главное меню") || text.equals("Asosiy menyu") || text.equals("/start")) {
+                states.put(chatId, EmployerState.WAITING_FOR_REG_FULL_NAME);
+            }
+            return handleRegistration(chatId, text, message, lang, profileOpt);
+        }
+
+        // ============================================
         // 1. GLOBAL BUYRUQLAR (INTERRUPT & ASOSIY MENYU)
         // ============================================
         if (isGlobalButton(text)) {
@@ -53,8 +68,8 @@ public class EmployerHandler {
 
             if (text.equals("🏠 Asosiy menyu") || text.equals("🏠 Главное меню") || text.equals("Asosiy menyu") || text.equals("/start")) {
                 return createMessage(chatId, getText(lang,
-                                "🏠 **Boshidan tanlang:**\nIltimos, quyidagi bo'limlardan birini tanlang:",
-                                "🏠 **Выберите сначала:**\nПожалуйста, выберите один из разделов ниже:"),
+                                "🏠 **Xush kelibsiz!**\nIltimos, quyidagi bo'limlardan birini tanlang:",
+                                "🏠 **Добро пожаловать!**\nПожалуйста, выберите один из разделов ниже:"),
                         getMainMenuKeyboard(lang));
             }
 
@@ -188,7 +203,7 @@ public class EmployerHandler {
             String reqText = isSkip(text) ? (lang.equals("ru") ? "Не указано" : "Ko'rsatilmadi") : text;
             draftData.get(chatId).put("requirements", reqText);
             states.put(chatId, EmployerState.WAITING_FOR_PHONE);
-            return createMessage(chatId, getText(lang, "📞 **Aloqa uchun telefon raqamini kiriting:**\n(Yoki tugma orqali jo'nating)", "📞 **Введите номер телефона для связи:**\n(Или отправьте через кнопку)"), getContactKeyboard(lang));
+            return createMessage(chatId, getText(lang, "📌 **Talablarni kiriting yoki O'tkazib yuboring:**", "📌 **Введите требования или пропустите:**"), getSkipKeyboard(lang));
         }
 
         if (state == EmployerState.WAITING_FOR_PHONE) {
@@ -236,6 +251,70 @@ public class EmployerHandler {
     }
 
     // ============================================
+    // RO'YXATDAN O'TISH (ISM, YOSH, PASPORT, TELEFON)
+    // ============================================
+    private SendMessage handleRegistration(Long chatId, String text, Message message, String lang, Optional<EmployerEntity> profileOpt) {
+        EmployerState regState = states.getOrDefault(chatId, EmployerState.WAITING_FOR_REG_FULL_NAME);
+
+        if (regState == EmployerState.WAITING_FOR_REG_FULL_NAME) {
+            if (text.isEmpty() || text.startsWith("/") || text.equals("🏠 Asosiy menyu") || text.equals("🏠 Главное меню")
+                    || text.toLowerCase().contains("ish beruvchi") || text.toLowerCase().contains("employer")) {
+                states.put(chatId, EmployerState.WAITING_FOR_REG_FULL_NAME);
+                return createMessage(chatId, getText(lang,
+                        "👤 **Ish beruvchi sifatida ro'yxatdan o'tish:**\n\nIltimos, ism va familiyangizni kiriting.\n💡 *Misol:* Shoxrux Sultanbayev",
+                        "👤 **Регистрация в качестве работодателя:**\n\nПожалуйста, введите ваше имя и фамилию.\n💡 *Пример:* Шохрух Султанбаев"));
+            }
+            draftData.get(chatId).put("reg_fio", text);
+            states.put(chatId, EmployerState.WAITING_FOR_REG_AGE);
+            return createMessage(chatId, getText(lang, "🎂 **Yoshingizni kiriting:**\n\n💡 *Misol:* 25", "🎂 **Введите ваш возраст:**\n\n💡 *Пример:* 25"), getCancelKeyboard(lang));
+        }
+
+        if (regState == EmployerState.WAITING_FOR_REG_AGE) {
+            if (!text.matches("^[1-9]\\d{1,2}$")) {
+                return createMessage(chatId, getText(lang, "⚠️ Yoshingizni to'g'ri kiriting (masalan: 25):", "⚠️ Введите правильный возраст (например: 25):"), getCancelKeyboard(lang));
+            }
+            draftData.get(chatId).put("reg_age", text);
+            states.put(chatId, EmployerState.WAITING_FOR_REG_PASSPORT);
+            return createMessage(chatId, getText(lang, "🪪 **Pasport seriya va raqamingizni kiriting:**\n\n💡 *Misol:* AA1234567", "🪪 **Введите серию и номер паспорта:**\n\n💡 *Пример:* AA1234567"), getCancelKeyboard(lang));
+        }
+
+        if (regState == EmployerState.WAITING_FOR_REG_PASSPORT) {
+            if (text.isEmpty() || text.length() < 5) {
+                return createMessage(chatId, getText(lang, "⚠️ Pasport seriya va raqami noto'g'ri. Qaytadan kiriting (Masalan: AA1234567):", "⚠️ Неверная серия и номер паспорта. Введите снова (Пример: AA1234567):"), getCancelKeyboard(lang));
+            }
+            draftData.get(chatId).put("reg_passport", text);
+            states.put(chatId, EmployerState.WAITING_FOR_REG_PHONE);
+            return createMessage(chatId, getText(lang, "📞 **Telefon raqamingizni yuboring:**", "📞 **Отправьте номер телефона:**"), getContactKeyboard(lang));
+        }
+
+        if (regState == EmployerState.WAITING_FOR_REG_PHONE) {
+            String phone = message.hasContact() ? message.getContact().getPhoneNumber() : text;
+            if (!isValidPhone(phone)) {
+                return createMessage(chatId, getText(lang, "⚠️ Telefon raqam noto'g'ri. Qaytadan yuboring:", "⚠️ Неверный номер. Отправьте снова:"), getContactKeyboard(lang));
+            }
+
+            Map<String, String> data = draftData.get(chatId);
+            EmployerEntity entity = profileOpt.orElseGet(() -> EmployerEntity.builder().employerChatId(chatId).language(lang).createdAt(LocalDateTime.now()).build());
+
+            entity.setFullName(data.get("reg_fio"));
+            String details = "Yosh: " + data.get("reg_age") + ", Pasport: " + data.get("reg_passport");
+            entity.setCompanyName(details);
+            entity.setPhoneNumber(phone);
+            if (entity.getLanguage() == null) entity.setLanguage(lang);
+            if (entity.getCreatedAt() == null) entity.setCreatedAt(LocalDateTime.now());
+
+            employerRepository.save(entity);
+            states.put(chatId, EmployerState.MAIN_MENU);
+            draftData.get(chatId).clear();
+
+            return createMessage(chatId, getText(lang, "✅ **Ro'yxatdan muvaffaqiyatli o'tdingiz!**", "✅ **Вы успешно зарегистрировались!**"), getMainMenuKeyboard(lang));
+        }
+
+        states.put(chatId, EmployerState.WAITING_FOR_REG_FULL_NAME);
+        return createMessage(chatId, getText(lang, "👤 Ism va familiyangizni kiriting:", "👤 Введите ваше имя и фамилию:"));
+    }
+
+    // ============================================
     // BILDIRISHNOMA YUBORISH (NOTIFICATION)
     // ============================================
     public SendMessage buildApplicationNotification(
@@ -278,14 +357,19 @@ public class EmployerHandler {
     // PROFIL VA VAKANSIYALARNI KO'RSATISH
     // ============================================
     private SendMessage showProfile(Long chatId, Optional<EmployerEntity> profileOpt, String lang) {
+        if (profileOpt.isEmpty() || profileOpt.get().getFullName() == null || profileOpt.get().getFullName().toLowerCase().contains("employer")) {
+            states.put(chatId, EmployerState.WAITING_FOR_REG_FULL_NAME);
+            return createMessage(chatId, getText(lang, "Iltimos, ism va familiyangizni kiriting:", "Пожалуйста, введите ваше имя и фамилию:"), getCancelKeyboard(lang));
+        }
+
+        EmployerEntity employer = profileOpt.get();
         String rating = "5.0 ⭐";
-        String currentLang = profileOpt.map(EmployerEntity::getLanguage).orElse(lang);
 
         String msg = lang.equals("ru") ?
-                String.format("👤 **Ваш профиль:**\n\n🆔 **Telegram ID:** %s\n🌐 **Язык:** %s\n⭐ **Рейтинг:** %s\n📝 **Статус:** Активный работодатель",
-                        chatId, currentLang, rating) :
-                String.format("👤 **Sizning profilingiz:**\n\n🆔 **Telegram ID:** %s\n🌐 **Til:** %s\n⭐ **Reyting:** %s\n📝 **Holat:** Faol ish beruvchi",
-                        chatId, currentLang, rating);
+                String.format("👤 **Ваш профиль:**\n\n🆔 **Telegram ID:** %s\n👤 **ФИО:** %s\n🪪 **Данные:** %s\n📞 **Телефон:** %s\n🌐 **Язык:** %s\n⭐ **Рейтинг:** %s\n📝 **Статус:** Активный работодатель",
+                        chatId, employer.getFullName(), employer.getCompanyName() != null ? employer.getCompanyName() : "Не указано", employer.getPhoneNumber() != null ? employer.getPhoneNumber() : "Не указано", employer.getLanguage(), rating) :
+                String.format("👤 **Sizning profilingiz:**\n\n🆔 **Telegram ID:** %s\n👤 **F.I.O:** %s\n🪪 **Ma'lumotlar:** %s\n📞 **Telefon:** %s\n🌐 **Til:** %s\n⭐ **Reyting:** %s\n📝 **Holat:** Faol ish beruvchi",
+                        chatId, employer.getFullName(), employer.getCompanyName() != null ? employer.getCompanyName() : "Ko'rsatilmagan", employer.getPhoneNumber() != null ? employer.getPhoneNumber() : "Ko'rsatilmagan", employer.getLanguage(), rating);
 
         return createMessage(chatId, msg, getMainMenuKeyboard(lang));
     }
@@ -376,6 +460,10 @@ public class EmployerHandler {
         return lang.equals("ru") ? ru : uz;
     }
 
+    private SendMessage createMessage(Long chatId, String text) {
+        return createMessage(chatId, text, null);
+    }
+
     private SendMessage createMessage(Long chatId, String text, ReplyKeyboard keyboard) {
         SendMessage message = new SendMessage(chatId.toString(), text);
         message.setParseMode("Markdown");
@@ -410,14 +498,6 @@ public class EmployerHandler {
 
     private ReplyKeyboardMarkup getCancelKeyboard(String lang) {
         return createReplyKeyboard(List.of(
-                List.of(getText(lang, "❌ Bekor qilish", "❌ Отмена")),
-                List.of(getText(lang, "🏠 Asosiy menyu", "🏠 Главное меню"))
-        ));
-    }
-
-    private ReplyKeyboardMarkup getSkipKeyboard(String lang) {
-        return createReplyKeyboard(List.of(
-                List.of(getText(lang, "⏭ O'tkazib yuborish", "⏭ Пропустить")),
                 List.of(getText(lang, "❌ Bekor qilish", "❌ Отмена")),
                 List.of(getText(lang, "🏠 Asosiy menyu", "🏠 Главное меню"))
         ));
@@ -470,6 +550,13 @@ public class EmployerHandler {
     private ReplyKeyboardMarkup getSalaryQuickKeyboard(String lang) {
         return createReplyKeyboard(List.of(
                 List.of(getText(lang, "Kelishiladi", "Договорная")),
+                List.of(getText(lang, "🏠 Asosiy menyu", "🏠 Главное меню"))
+        ));
+    }
+
+    private ReplyKeyboardMarkup getSkipKeyboard(String lang) {
+        return createReplyKeyboard(List.of(
+                List.of(getText(lang, "⏭ O'tkazib yuborish", "⏭ Пропустить")),
                 List.of(getText(lang, "🏠 Asosiy menyu", "🏠 Главное меню"))
         ));
     }
