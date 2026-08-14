@@ -3,6 +3,7 @@ package uz.imaan.jobplatform.admin.controller;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import org.springframework.http.HttpStatus;
 import uz.imaan.jobplatform.admin.dto.AdminDTO;
 import uz.imaan.jobplatform.admin.service.AdminService;
 import lombok.RequiredArgsConstructor;
@@ -85,5 +86,6 @@ public ResponseEntity<String> unblockUser(@PathVariable Long userId) {
 
         return ResponseEntity.ok(workerDetails);
     }
+
 }
 

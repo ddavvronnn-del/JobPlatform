@@ -19,7 +19,6 @@ public class EmployerEntity {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "employer_chat_id", unique = true)
     private Long employerChatId;
     private String fullName;
     private String title;

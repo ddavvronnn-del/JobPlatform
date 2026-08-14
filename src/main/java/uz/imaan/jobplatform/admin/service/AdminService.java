@@ -3,34 +3,43 @@ package uz.imaan.jobplatform.admin.service;
 import jakarta.transaction.Transactional;
 import jakarta.validation.constraints.NotNull;
 import lombok.RequiredArgsConstructor;
-import lombok.Value;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import uz.imaan.jobplatform.admin.TelegramBotService;
 import uz.imaan.jobplatform.admin.entity.Admin;
-
 import uz.imaan.jobplatform.admin.dto.AdminDTO;
 import uz.imaan.jobplatform.admin.mapper.AdminMapper;
 import uz.imaan.jobplatform.admin.repository.AdminRepository;
+import uz.imaan.jobplatform.employer.entity.EmployerEntity;
+import uz.imaan.jobplatform.employer.repository.EmployerRepository;
 import uz.imaan.jobplatform.jobseeker.entity.JobSeekerProfile;
 import uz.imaan.jobplatform.jobseeker.repository.JobSeekerProfileRepository;
-
-
 import java.util.List;
 import java.util.stream.Collectors;
 
 
-@RequiredArgsConstructor
+
 @Service
 public class AdminService {
     private final AdminRepository adminRepository;
     private final AdminMapper adminMapper;
     private final JobSeekerProfileRepository jobSeekerProfileRepository;
-    @Lazy
-    @Autowired
-    private  TelegramBotService telegramBotService;
+    private final EmployerRepository employerRepository;
+   private  final TelegramBotService telegramBotService;
 
+   @Autowired
+    public AdminService(AdminRepository adminRepository,
+                        AdminMapper adminMapper,
+                        JobSeekerProfileRepository jobSeekerProfileRepository,
+                        EmployerRepository employerRepository,
+                        @Lazy TelegramBotService telegramBotService) { // 👈 @Lazy должен быть ЗДЕСЬ
+        this.adminRepository = adminRepository;
+        this.adminMapper = adminMapper;
+        this.jobSeekerProfileRepository = jobSeekerProfileRepository;
+        this.employerRepository = employerRepository;
+        this.telegramBotService = telegramBotService;
+    }
 
     public List<AdminDTO> getAllAdmins() {
         return adminRepository.findAll()
@@ -157,6 +166,61 @@ public class AdminService {
         for (Long chatId : adminChatIds) {
             telegramBotService.sendMessage(chatId, message);
         }
+    }
+
+    public AdminService(JobSeekerProfileRepository jobSeekerRepository,
+                        EmployerRepository employerRepository, AdminRepository adminRepository, AdminMapper adminMapper, EmployerRepository employerRepository1, TelegramBotService telegramBotService) {
+        this.jobSeekerProfileRepository = jobSeekerRepository;
+        this.adminRepository = adminRepository;
+        this.adminMapper = adminMapper;
+        this.employerRepository = employerRepository;
+        this.telegramBotService = telegramBotService;
+    }
+
+    // 👷‍♂️ Получить всех рабочих (соискателей)
+    public List<JobSeekerProfile> getAllJobSeekers() {
+        return jobSeekerProfileRepository.findAll();
+    }
+
+    // 💼 Получить всех работодателей
+    public List<EmployerEntity> getAllEmployers() {
+        return employerRepository.findAll();
+    }
+
+    // 📝 Форматированный текст для Telegram-бота: Список Рабочих
+    public String getFormattedJobSeekersList() {
+        List<JobSeekerProfile> list = getAllJobSeekers();
+        if (list.isEmpty()) {
+            return "👷‍♂️ **Список рабочих пуст.**";
+        }
+
+        StringBuilder sb = new StringBuilder("👷‍♂️ **Список всех рабочих (соискателей):**\n\n");
+        for (int i = 0; i < list.size(); i++) {
+            JobSeekerProfile seeker = list.get(i);
+            sb.append(i + 1).append(". ")
+                    .append(seeker.getFullName() != null ? seeker.getFullName() : "Без имени")
+                    .append(" | 📞 ").append(seeker.getPhoneNumber() != null ? seeker.getPhoneNumber() : "Нет номера")
+                    .append("\n");
+        }
+        return sb.toString();
+    }
+
+    // 📝 Форматированный текст для Telegram-бота: Список Работодателей
+    public String getFormattedEmployersList() {
+        List<EmployerEntity> list = getAllEmployers();
+        if (list.isEmpty()) {
+            return "💼 **Список работодателей пуст.**";
+        }
+
+        StringBuilder sb = new StringBuilder("💼 **Список всех работодателей:**\n\n");
+        for (int i = 0; i < list.size(); i++) {
+            EmployerEntity emp = list.get(i);
+            sb.append(i + 1).append(". ")
+                    .append(emp.getCompanyName() != null ? emp.getCompanyName() : "Без названия")
+                    .append(" | 📞 ").append(emp.getPhoneNumber() != null ? emp.getPhoneNumber() : "Нет номера")
+                    .append("\n");
+        }
+        return sb.toString();
     }
 
     

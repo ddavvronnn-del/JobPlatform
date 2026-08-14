@@ -22,7 +22,7 @@ import uz.imaan.jobplatform.jobseeker.entity.JobApplication;
 import uz.imaan.jobplatform.jobseeker.entity.JobSeekerProfile;
 import uz.imaan.jobplatform.jobseeker.repository.JobApplicationRepository;
 import uz.imaan.jobplatform.jobseeker.repository.JobSeekerProfileRepository;
-import uz.imaan.jobplatform.telegram.handler.interfaces.JobSeekerHandler;
+import uz.imaan.jobplatform.telegram.JobSeekerHandler.interfaces.JobSeekerHandler;
 
 import java.util.ArrayList;
 import java.util.List;
