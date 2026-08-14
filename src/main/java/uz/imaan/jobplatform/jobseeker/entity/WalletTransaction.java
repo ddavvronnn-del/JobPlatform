@@ -1,6 +1,8 @@
 package uz.imaan.jobplatform.jobseeker.entity;
 
 import jakarta.persistence.*;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Positive;
 import lombok.*;
 
 import java.math.BigDecimal;
@@ -20,11 +22,15 @@ public class WalletTransaction {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @NotNull(message = "Ish izlovchi ID si kiritilishi shart")
     @Column(name = "job_seeker_id", nullable = false)
     private Long jobSeekerId;
 
+    @NotNull(message = "Miqdor kiritilishi shart")
+    @Positive(message = "Miqdor musbat bo'lishi kerak")
     private BigDecimal amount;
 
+    @NotNull(message = "Tranzaksiya turi kiritilishi shart")
     @Enumerated(EnumType.STRING)
     private TransactionType type;
 

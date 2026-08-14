@@ -16,7 +16,7 @@ public class Admin {
     // Геттеры и сеттеры (обязательно должны быть!)
         public Long getTelegramId() { return telegramId; }
         public void setTelegramId(Long telegramId) { this.telegramId = telegramId; }
-        // ... остальные геттеры/сеттеры
+    // ... остальные геттеры/сеттеры
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
