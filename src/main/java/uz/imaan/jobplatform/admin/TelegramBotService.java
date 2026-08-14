@@ -4,6 +4,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.telegram.telegrambots.bots.TelegramLongPollingBot;
+import org.telegram.telegrambots.meta.api.methods.AnswerCallbackQuery;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
 import org.telegram.telegrambots.meta.api.methods.updatingmessages.EditMessageText;
 import org.telegram.telegrambots.meta.api.objects.CallbackQuery;
@@ -16,9 +17,14 @@ import uz.imaan.jobplatform.admin.dto.AdminDTO;
 import uz.imaan.jobplatform.admin.service.AdminService;
 
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 @Service
 public class TelegramBotService extends TelegramLongPollingBot {
+
+    private final Map<Long, String> userStates = new ConcurrentHashMap<>();
+    private final Map<Long, AdminDTO> pendingAdmins = new ConcurrentHashMap<>();
 
     private String botUsername = "jobplatform_admin_bot";
     @Lazy
@@ -41,6 +47,52 @@ public class TelegramBotService extends TelegramLongPollingBot {
 
     @Override
     public void onUpdateReceived(Update update) {
+        if (!update.hasMessage() || !update.getMessage().hasText()) return;
+
+        String text = update.getMessage().getText();
+        long chatId = update.getMessage().getChatId();
+        String state = userStates.getOrDefault(chatId, "IDLE");
+
+        // 1. Старт создания
+        if (text.equalsIgnoreCase("/newadmin")) {
+            userStates.put(chatId, "WAITING_USERNAME");
+            pendingAdmins.put(chatId, new AdminDTO());
+            sendMessage(chatId, "Введите **Username** для нового админа:");
+            return;
+        }
+
+        // 2. Ввод Username
+        if ("WAITING_USERNAME".equals(state)) {
+            pendingAdmins.get(chatId).setUsername(text);
+            userStates.put(chatId, "WAITING_EMAIL");
+            sendMessage(chatId, "Отлично! Теперь введите **Email**:");
+            return;
+        }
+
+        // 3. Ввод Email
+        if ("WAITING_EMAIL".equals(state)) {
+            pendingAdmins.get(chatId).setEmail(text);
+            userStates.put(chatId, "WAITING_PASSWORD");
+            sendMessage(chatId, "Теперь введите **Пароль**:");
+            return;
+        }
+
+        // 4. Ввод Пароля и финализация
+        if ("WAITING_PASSWORD".equals(state)) {
+            AdminDTO dto = pendingAdmins.get(chatId);
+            dto.setPassword(text);
+
+            try {
+                adminService.createAdmin(dto);
+                sendMessage(chatId, "🎉 Администратор **" + dto.getUsername() + "** успешно добавлен!");
+            } catch (Exception e) {
+                sendMessage(chatId, "❌ Не удалось создать админа: " + e.getMessage());
+            } finally {
+                // Очищаем состояние
+                userStates.remove(chatId);
+                pendingAdmins.remove(chatId);
+            }
+        }
         try {
             if (update.hasMessage() && update.getMessage().hasText()) {
                 handleTextMessage(update.getMessage());
@@ -51,58 +103,79 @@ public class TelegramBotService extends TelegramLongPollingBot {
             System.err.println("❌ Ошибка при обработке сообщения от Telegram:");
             e.printStackTrace();
         }
+
+
     }
 
     private void handleTextMessage(Message message) {
-        
         long chatId = message.getChatId();
         long userId = message.getFrom().getId();
-        String text = message.getText();
+        String messageText = message.getText();
 
-        if ("/start".equals(text)) {
+        if (messageText == null) return;
+
+        // Логирование входящих сообщений
+        System.out.println(">>> ПРИШЛО СООБЩЕНИЕ. ChatId: " + chatId + ", UserId: " + userId + ", Text: " + messageText);
+
+        // 👨‍🔧 Просмотр рабочих
+        if (messageText.equals("👨‍🔧 Рабочие") || messageText.equals("👷 Рабочие") || messageText.equals("/workers")) {
+            String responseText = adminService.getFormattedJobSeekersList();
+            sendMessage(chatId, responseText);
+            return;
+        }
+        // 💼 Просмотр работодателей
+        else if (messageText.equals("💼 Работодатели") || messageText.equals("/employers")) {
+            String responseText = adminService.getFormattedEmployersList();
+            sendMessage(chatId, responseText);
+            return;
+        }
+
+        // Команда /start
+        if ("/start".equals(messageText)) {
             sendMessage(chatId, "Привет! Бот поиска почасовой работы JobPlatform запущен.");
-        } else if ("/admin".equals(text)) {
-            // Если это ваш Telegram ID ИЛИ пользователь является админом в базе
+        }
+        // Команда /admin
+        else if ("/admin".equals(messageText)) {
             if (chatId != 6326035618L && !adminService.isAdmin(chatId)) {
                 sendMessage(chatId, "⛔ У вас нет прав администратора.");
                 return;
             }
             sendAdminMenu(chatId);
-        
         }
-        System.out.println(">>> ПРИШЛО СООБЩЕНИЕ. ChatId: " + chatId + ", UserId: " + userId); // <--- ДОБАВИТЬ ЭТУ СТРОКУ
     }
 
     private void handleCallbackQuery(CallbackQuery callbackQuery) {
         long userId = callbackQuery.getFrom().getId();
         long chatId = callbackQuery.getMessage().getChatId();
-        int messageId = callbackQuery.getMessage().getMessageId();
         String data = callbackQuery.getData();
 
-        if (!adminService.isAdmin(userId)) {
-            sendMessage(chatId, "⛔ У вас нет доступа к админ-панели.");
-            return;
+        // 1. ВЫВОДИМ В КОНСОЛЬ IDE — доходит ли клик
+        System.out.println(">>> НАЖАТА ИНЛАЙН-КНОПКА! Data: [" + data + "], UserId: " + userId);
+
+        // 2. Гасим часики на кнопке
+        try {
+            AnswerCallbackQuery answer = new AnswerCallbackQuery();
+            answer.setCallbackQueryId(callbackQuery.getId());
+            execute(answer);
+        } catch (Exception e) {
+            System.err.println("Ошибка при гашении часиков: " + e.getMessage());
         }
 
-        if ("admin_stats".equals(data)) {
+        // 3. Отправляем простой ответ БЕЗ Markdown (чтобы исключить ошибки форматирования)
+        try {
             AdminDTO stats = adminService.getStats();
-            String statsText = String.format(
-                    "📊 *Статистика платформы:*\n\n" +
-                            "👥 Всего админов: `%d`\n" +
-                            "🏢 Работодателей: `%d`\n" +
-                            "👷‍♂️ Исполнителей: `%d`\n" +
-                            "💼 Всего вакансий: `%d`\n" +
-                            "⚡ Активных смен: `%d`\n" +
-                            "✅ Завершенных смен: `%d`",
-                    stats.getTotalAdmins(),
-                    stats.getTotalEmployers(),
-                    stats.getTotalWorkers(),
-                    stats.getTotalJobs(),
-                    stats.getActiveJobs(),
-                    stats.getCompletedJobs()
-            );
 
-            editMessageText(chatId, messageId, statsText, getAdminKeyboard());
+            String simpleText = "Статистика платформы:\n" +
+                    "Админов: " + stats.getTotalAdmins() + "\n" +
+                    "Работодателей: " + stats.getTotalEmployers() + "\n" +
+                    "Исполнителей: " + stats.getTotalWorkers();
+
+            sendMessage(chatId, simpleText);
+
+        } catch (Exception e) {
+            System.err.println("❌ Ошибка при выполнении getStats():");
+            e.printStackTrace();
+            sendMessage(chatId, "❌ Произошла ошибка на сервере при получении статистики.");
         }
     }
 
@@ -253,5 +326,8 @@ public class TelegramBotService extends TelegramLongPollingBot {
 
         executeMessage(sendMessage);
     }
+
+    // Пример обработки команд/кнопок в боте:
+
 
 }

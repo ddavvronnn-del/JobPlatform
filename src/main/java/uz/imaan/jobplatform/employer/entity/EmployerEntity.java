@@ -18,7 +18,7 @@ public class EmployerEntity {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
-
+    private String companyName;
     private Long employerChatId;
     private String fullName;
     private String title;
@@ -29,7 +29,6 @@ public class EmployerEntity {
     private String requirements;
     private String status;
     private LocalDateTime createdAt;
-
     private String inn;
     private String passportSeriesNumber;
     private String phoneNumber;

@@ -26,6 +26,8 @@ import lombok.NoArgsConstructor;
         private Long totalAdmins;
         private Long userId;
         private String reason;
+        private String Email;
+        private String Password;
 
 
     }
