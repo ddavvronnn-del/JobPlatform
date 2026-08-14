@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
+import org.telegram.telegrambots.meta.api.objects.CallbackQuery;
 import org.telegram.telegrambots.meta.api.objects.Message;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.ReplyKeyboard;
@@ -16,7 +17,6 @@ import uz.imaan.jobplatform.employer.job.JobVacancy;
 import uz.imaan.jobplatform.employer.job.JobVacancyRepository;
 import uz.imaan.jobplatform.employer.repository.EmployerRepository;
 import uz.imaan.jobplatform.employer.state.EmployerState;
-
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
@@ -136,17 +136,12 @@ public class EmployerHandler {
             }
             draftData.get(chatId).put("title", text);
             states.put(chatId, EmployerState.WAITING_FOR_CATEGORY);
-            return createMessage(chatId, getText(lang, "📁 **Kategoriyani tanlang yoki kiriting:**", "📁 **Выберите или введите категорию:**"), getCategoryKeyboard(lang));
+            return createMessage(chatId, getText(lang, "📁 **Kategoriyani tanlang:**", "📁 **Выберите категорию:**"), getCategoryKeyboard(lang));
         }
 
         if (state == EmployerState.WAITING_FOR_CATEGORY) {
             if (!isValidCategory(text)) {
-                return createMessage(chatId, getText(lang, "⚠️ **Kategoriya nomini to'g'ri kiriting:**", "⚠️ **Введите правильную категорию:**"), getCategoryKeyboard(lang));
-            }
-
-            if (text.equals("➕ Boshqa (Kiritish)") || text.equals("➕ Другое (Ввести)")) {
-                states.put(chatId, EmployerState.WAITING_FOR_CUSTOM_CATEGORY);
-                return createMessage(chatId, getText(lang, "📝 **Kategoriya nomini qo'lda kiriting:**", "📝 **Введите название категории вручную:**"), getCancelKeyboard(lang));
+                return createMessage(chatId, getText(lang, "⚠️ **Kategoriya nomini tugma orqali tanlang:**", "⚠️ **Выберите категорию с помощью кнопок:**"), getCategoryKeyboard(lang));
             }
 
             draftData.get(chatId).put("category", text);
@@ -251,6 +246,42 @@ public class EmployerHandler {
     }
 
     // ============================================
+    // CALLBACK QUERY HANDLER (INLINE BUTTONS)
+    // ============================================
+    public SendMessage handleCallback(CallbackQuery callbackQuery) {
+        if (callbackQuery == null || callbackQuery.getMessage() == null) return null;
+
+        Long chatId = callbackQuery.getMessage().getChatId();
+        String data = callbackQuery.getData();
+        draftData.putIfAbsent(chatId, new ConcurrentHashMap<>());
+
+        Optional<EmployerEntity> profileOpt = employerRepository.findByEmployerChatId(chatId);
+        String lang = profileOpt.map(EmployerEntity::getLanguage).orElse("uz");
+
+        EmployerState state = states.getOrDefault(chatId, EmployerState.MAIN_MENU);
+
+        if (state == EmployerState.WAITING_FOR_CATEGORY && data != null && data.startsWith("emp_cat_")) {
+            String catValue = data.substring("emp_cat_".length());
+
+            if (catValue.equals("OTHER")) {
+                states.put(chatId, EmployerState.WAITING_FOR_CUSTOM_CATEGORY);
+                return createMessage(chatId, getText(lang, "📝 **Kategoriya nomini qo'lda kiriting:**", "📝 **Введите название категории вручную:**"), getCancelKeyboard(lang));
+            }
+
+            if (catValue.equals("MENU")) {
+                states.put(chatId, EmployerState.MAIN_MENU);
+                return createMessage(chatId, getText(lang, "📢 **Ish beruvchi menyusi:**", "📢 **Меню работодателя:**"), getMainMenuKeyboard(lang));
+            }
+
+            draftData.get(chatId).put("category", catValue);
+            states.put(chatId, EmployerState.WAITING_FOR_JOB_TYPE);
+            return createMessage(chatId, getText(lang, "⏰ **Ish turini tanlang:**", "⏰ **Выберите тип работы:**"), getTypeKeyboard(lang));
+        }
+
+        return null;
+    }
+
+    // ============================================
     // RO'YXATDAN O'TISH (ISM, YOSH, PASPORT, TELEFON)
     // ============================================
     private SendMessage handleRegistration(Long chatId, String text, Message message, String lang, Optional<EmployerEntity> profileOpt) {
@@ -261,8 +292,8 @@ public class EmployerHandler {
                     || text.toLowerCase().contains("ish beruvchi") || text.toLowerCase().contains("employer")) {
                 states.put(chatId, EmployerState.WAITING_FOR_REG_FULL_NAME);
                 return createMessage(chatId, getText(lang,
-                        "👤 **Ish beruvchi sifatida ro'yxatdan o'tish:**\n\nIltimos, ism va familiyangizni kiriting.\n💡 *Misol:* Shoxrux Sultanbayev",
-                        "👤 **Регистрация в качестве работодателя:**\n\nПожалуйста, введите ваше имя и фамилию.\n💡 *Пример:* Шохрух Султанбаев"));
+                        "👤 **Ish beruvchi sifatida ro'yxatdan o'tish:**\n\nIltimos, ism va familiyangizni kiriting.\n💡 *Misol:* Aliyev Valijon",
+                        "👤 **Регистрация в качестве работодателя:**\n\nПожалуйста, введите ваше имя и фамилию.\n💡 *Пример:* Алиев Валижон"));
             }
             draftData.get(chatId).put("reg_fio", text);
             states.put(chatId, EmployerState.WAITING_FOR_REG_AGE);
@@ -354,7 +385,7 @@ public class EmployerHandler {
     }
 
     // ============================================
-    // PROFIL VA VAKANSIYALARNI KO'RSATISH
+    // PROFIL VA VAKANSIYALARni KO'RSATISH
     // ============================================
     private SendMessage showProfile(Long chatId, Optional<EmployerEntity> profileOpt, String lang) {
         if (profileOpt.isEmpty() || profileOpt.get().getFullName() == null || profileOpt.get().getFullName().toLowerCase().contains("employer")) {
@@ -518,16 +549,42 @@ public class EmployerHandler {
         return keyboardMarkup;
     }
 
-    private ReplyKeyboardMarkup getCategoryKeyboard(String lang) {
-        return createReplyKeyboard(List.of(
-                List.of("💻 IT & Dasturlash", "🎨 Dizayn"),
-                List.of("🏗️ Qurilish", "🚗 Haydovchi / Kuryer"),
-                List.of("📚 Ta'lim / Repetitor", "🛒 Savdo / Sotuvchi"),
-                List.of("🧹 Farrosh / Tozalash", "👨‍🍳 Pazanda / Oshpaz"),
-                List.of("🔒 Qorovul / Xavfsizlik", "📦 Kuryer / Yetkazib berish"),
-                List.of(getText(lang, "➕ Boshqa (Kiritish)", "➕ Другое (Ввести)")),
-                List.of(getText(lang, "🏠 Asosiy menyu", "🏠 Главное меню"))
-        ));
+    private InlineKeyboardMarkup getCategoryKeyboard(String lang) {
+        InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
+        List<List<InlineKeyboardButton>> rows = new java.util.ArrayList<>();
+
+        List<String> categories = List.of(
+                "💻 IT & Dasturlash", "🎨 Dizayn",
+                "🏗️ Qurilish", "🚗 Haydovchi / Kuryer",
+                "📚 Ta'lim / Repetitor", "🛒 Savdo / Sotuvchi",
+                "🧹 Farrosh / Tozalash", "👨‍🍳 Pazanda / Oshpaz",
+                "🔒 Qorovul / Xavfsizlik", "📦 Kuryer / Yetkazib berish"
+        );
+
+        for (int i = 0; i < categories.size(); i += 2) {
+            InlineKeyboardButton btn1 = new InlineKeyboardButton();
+            btn1.setText(categories.get(i));
+            btn1.setCallbackData("emp_cat_" + categories.get(i));
+
+            InlineKeyboardButton btn2 = new InlineKeyboardButton();
+            btn2.setText(categories.get(i + 1));
+            btn2.setCallbackData("emp_cat_" + categories.get(i + 1));
+
+            rows.add(List.of(btn1, btn2));
+        }
+
+        InlineKeyboardButton otherBtn = new InlineKeyboardButton();
+        otherBtn.setText(lang.equals("ru") ? "➕ Другое (Ввести)" : "➕ Boshqa (Kiritish)");
+        otherBtn.setCallbackData("emp_cat_OTHER");
+        rows.add(List.of(otherBtn));
+
+        InlineKeyboardButton menuBtn = new InlineKeyboardButton();
+        menuBtn.setText(lang.equals("ru") ? "🏠 Главное меню" : "🏠 Asosiy menyu");
+        menuBtn.setCallbackData("emp_cat_MENU");
+        rows.add(List.of(menuBtn));
+
+        markup.setKeyboard(rows);
+        return markup;
     }
 
     private ReplyKeyboardMarkup getTypeKeyboard(String lang) {

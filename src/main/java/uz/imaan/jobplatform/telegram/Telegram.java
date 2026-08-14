@@ -23,7 +23,6 @@ import uz.imaan.jobplatform.jobseeker.entity.JobSeekerProfile;
 import uz.imaan.jobplatform.jobseeker.repository.JobApplicationRepository;
 import uz.imaan.jobplatform.jobseeker.repository.JobSeekerProfileRepository;
 import uz.imaan.jobplatform.telegram.JobSeekerHandler.interfaces.JobSeekerHandler;
-
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -84,6 +83,17 @@ public class Telegram extends TelegramLongPollingBot {
             log.info("📩 Callback: chatId={}, data={}", chatId, callbackData);
 
             try {
+                // ============================================
+                // ISH BERUVCHI KATEGORIYA CALLBACK'LARI (emp_cat_)
+                // ============================================
+                if (callbackData != null && callbackData.startsWith("emp_cat_")) {
+                    SendMessage response = employerHandler.handleCallback(callbackQuery);
+                    if (response != null) {
+                        executeMessage(response);
+                    }
+                    return;
+                }
+
                 // ============================================
                 // ARIZANI QABUL QILISH VA RAD ETISH
                 // ============================================
