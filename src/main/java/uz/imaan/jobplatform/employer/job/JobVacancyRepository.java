@@ -7,9 +7,8 @@ import java.util.List;
 
 @Repository
 public interface JobVacancyRepository extends JpaRepository<JobVacancy, Long> {
-
     List<JobVacancy> findByEmployerChatId(Long chatId);
 
-    // ✅ Kategoriya bo'yicha qidirish (qo'shimcha)
-    List<JobVacancy> findByCategoryContainingIgnoreCase(String category);
+    List<JobVacancy> findAllByEmployerChatId(Long chatId);
+    // JpaRepository o'zi avtomatik save(), findById(), delete() kabi barcha metodlarni beradi
 }

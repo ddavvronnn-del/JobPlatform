@@ -6,6 +6,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.telegram.telegrambots.bots.TelegramLongPollingBot;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
+import org.telegram.telegrambots.meta.api.methods.updatingmessages.EditMessageText;
 import org.telegram.telegrambots.meta.api.objects.CallbackQuery;
 import org.telegram.telegrambots.meta.api.objects.Message;
 import org.telegram.telegrambots.meta.api.objects.Update;
@@ -22,7 +23,6 @@ import uz.imaan.jobplatform.jobseeker.entity.JobSeekerProfile;
 import uz.imaan.jobplatform.jobseeker.repository.JobApplicationRepository;
 import uz.imaan.jobplatform.jobseeker.repository.JobSeekerProfileRepository;
 import uz.imaan.jobplatform.telegram.handler.interfaces.JobSeekerHandler;
-
 
 import java.util.ArrayList;
 import java.util.List;
@@ -55,7 +55,7 @@ public class Telegram extends TelegramLongPollingBot {
             JobStore jobStore,
             JobSeekerProfileRepository jobSeekerProfileRepository,
             JobApplicationRepository jobApplicationRepository,
-            @Value("8449248126:AAFPgTpsBD2o1k_cp8YbG8_wqp9o8KnRCss") String botToken) {
+            @Value("${telegram.bot.token:8449248126:AAFPgTpsBD2o1k_cp8YbG8_wqp9o8KnRCss}") String botToken) {
         super(botToken);
         this.jobSeekerHandler = jobSeekerHandler;
         this.employerHandler = employerHandler;
@@ -85,6 +85,46 @@ public class Telegram extends TelegramLongPollingBot {
 
             try {
                 // ============================================
+                // ARIZANI QABUL QILISH VA RAD ETISH
+                // ============================================
+                if (callbackData.startsWith("accept_app_") || callbackData.startsWith("reject_app_")) {
+                    boolean isAccept = callbackData.startsWith("accept_app_");
+                    String prefix = isAccept ? "accept_app_" : "reject_app_";
+                    String[] parts = callbackData.replace(prefix, "").split("_");
+
+                    Long appId = Long.parseLong(parts[0]);
+                    Long seekerChatId = Long.parseLong(parts[1]);
+                    Integer messageId = callbackQuery.getMessage().getMessageId();
+
+                    // Database holatini yangilash
+                    Optional<JobApplication> appOpt = jobApplicationRepository.findById(appId);
+                    if (appOpt.isPresent()) {
+                        JobApplication app = appOpt.get();
+                        app.setStatus(isAccept ? JobApplication.ApplicationStatus.ACCEPTED : JobApplication.ApplicationStatus.REJECTED);
+                        jobApplicationRepository.save(app);
+                    }
+
+                    // 1. Ish beruvchi xabarini tahrirlash (tugmalarni olib tashlab status yozish)
+                    EditMessageText editMsg = new EditMessageText();
+                    editMsg.setChatId(chatId.toString());
+                    editMsg.setMessageId(messageId);
+                    editMsg.setText(isAccept ? "✅ **Ushbu ariza qabul qilindi!**" : "❌ **Ushbu ariza rad etildi.**");
+                    editMsg.setParseMode("Markdown");
+                    executeEditMessage(editMsg);
+
+                    // 2. Nomzod (JobSeeker) ga bildirishnoma yuborish
+                    String seekerText = isAccept ?
+                            "🎉 **Xushxabar!** Sizning arizangiz ish beruvchi tomonidan qabul qilindi. Tez orada siz bilan bog'lanishadi!" :
+                            "😔 **Afsuski**, sizning arizangiz ish beruvchi tomonidan rad etildi.";
+
+                    SendMessage seekerMsg = new SendMessage(seekerChatId.toString(), seekerText);
+                    seekerMsg.setParseMode("Markdown");
+                    executeMessage(seekerMsg);
+
+                    return;
+                }
+
+                // ============================================
                 // TIL TANLASH (lang_uz, lang_ru, lang_en)
                 // ============================================
                 if (callbackData.startsWith("lang_")) {
@@ -113,7 +153,6 @@ public class Telegram extends TelegramLongPollingBot {
                     String categoryKey = callbackData.replace("category_", "");
                     String categoryName = getCategoryName(categoryKey);
 
-                    // Barcha vakansiyalarni olish
                     List<JobVacancy> allVacancies = jobStore.getAllVacancies();
 
                     log.info("📋 Barcha vakansiyalar soni: {}", allVacancies.size());
@@ -130,7 +169,7 @@ public class Telegram extends TelegramLongPollingBot {
 
                     log.info("🔍 Kategoriya: {}, topilgan: {} ta", categoryName, vacancies.size());
 
-                    if (vacancies == null || vacancies.isEmpty()) {
+                    if (vacancies.isEmpty()) {
                         String msg = "🔍 Ushbu kategoriya bo'yicha hozircha vakansiyalar mavjud emas.";
                         SendMessage response = new SendMessage();
                         response.setChatId(chatId.toString());
@@ -148,7 +187,6 @@ public class Telegram extends TelegramLongPollingBot {
                     titleResponse.setParseMode("Markdown");
                     executeMessage(titleResponse);
 
-                    // Har bir vakansiyani alohida xabar qilib yuborish
                     for (JobVacancy vacancy : vacancies) {
                         String vacancyText = String.format(
                                 "📌 **%s**\n" +
@@ -161,7 +199,6 @@ public class Telegram extends TelegramLongPollingBot {
                                 vacancy.getSalary() != null ? vacancy.getSalary() : "Kelishilgan"
                         );
 
-                        // "Ariza topshirish" tugmasi
                         InlineKeyboardMarkup applyMarkup = new InlineKeyboardMarkup();
                         List<List<InlineKeyboardButton>> applyRows = new ArrayList<>();
                         List<InlineKeyboardButton> applyRow = new ArrayList<>();
@@ -180,7 +217,6 @@ public class Telegram extends TelegramLongPollingBot {
                         executeMessage(vacancyResponse);
                     }
 
-                    // Orqaga tugmasi
                     InlineKeyboardMarkup backMarkup = new InlineKeyboardMarkup();
                     List<List<InlineKeyboardButton>> backRows = new ArrayList<>();
                     List<InlineKeyboardButton> backRow = new ArrayList<>();
@@ -219,7 +255,6 @@ public class Telegram extends TelegramLongPollingBot {
                 if (callbackData.startsWith("apply_")) {
                     Long vacancyId = Long.parseLong(callbackData.replace("apply_", ""));
 
-                    // Foydalanuvchi ro'yxatdan o'tganligini tekshirish
                     Optional<JobSeekerProfile> profileOpt = jobSeekerProfileRepository.findByUserId(chatId);
                     if (profileOpt.isEmpty()) {
                         SendMessage response = new SendMessage();
@@ -229,7 +264,6 @@ public class Telegram extends TelegramLongPollingBot {
                         return;
                     }
 
-                    // Vakansiyani topish
                     JobVacancy vacancy = jobStore.getAllVacancies().stream()
                             .filter(v -> v.getId().equals(vacancyId))
                             .findFirst()
@@ -243,38 +277,30 @@ public class Telegram extends TelegramLongPollingBot {
                         return;
                     }
 
-                    // Arizani saqlash
+                    // Arizani bazaga saqlash
                     JobSeekerProfile profile = profileOpt.get();
                     JobApplication application = new JobApplication();
                     application.setJobId(vacancy.getId());
                     application.setJobSeekerId(profile.getId());
                     application.setCoverLetter("Ariza topshirildi");
                     application.setStatus(JobApplication.ApplicationStatus.PENDING);
-                    jobApplicationRepository.save(application);
+                    JobApplication savedApp = jobApplicationRepository.save(application);
 
-                    // Ish beruvchiga xabar yuborish
+                    // Ish beruvchiga Qabul qilish / Rad etish tugmalari bilan bildirishnoma yuborish
                     Long employerChatId = vacancy.getEmployerChatId();
                     if (employerChatId != null) {
-                        String notifyText = String.format(
-                                "📩 **Vakansiyangizga yangi ariza keldi!**\n\n" +
-                                        "📌 **Vakansiya:** %s\n" +
-                                        "👤 **Nomzod:** %s\n" +
-                                        "🪪 **Pasport:** %s\n" +
-                                        "📞 **Tel:** %s\n" +
-                                        "📝 **Tajriba:** %s",
+                        SendMessage notifyMsg = employerHandler.buildApplicationNotification(
+                                employerChatId,
+                                savedApp.getId(),
+                                chatId,
                                 vacancy.getTitle(),
                                 profile.getFullName() != null ? profile.getFullName() : "Kiritilmagan",
-                                profile.getPassportNumber() != null ? profile.getPassportNumber() : "Kiritilmagan",
                                 profile.getPhoneNumber() != null ? profile.getPhoneNumber() : "Kiritilmagan",
-                                profile.getExperience() != null ? profile.getExperience() : "Kiritilmagan"
+                                "uz"
                         );
-
-                        SendMessage notifyMsg = new SendMessage(employerChatId.toString(), notifyText);
-                        notifyMsg.setParseMode("Markdown");
                         executeMessage(notifyMsg);
                     }
 
-                    // Foydalanuvchiga javob yuborish
                     SendMessage response = new SendMessage();
                     response.setChatId(chatId.toString());
                     response.setText("✅ Ariza muvaffaqiyatli topshirildi!");
@@ -299,20 +325,17 @@ public class Telegram extends TelegramLongPollingBot {
 
         log.info("📩 Xabar: chatId={}, text={}", chatId, text);
 
-        // /start yoki "🔄 Rolni o'zgartirish"
-        if (text.equals("/start") || text.equals("🔄 Rolni o'zgartirish") || text.equals("Asosiy menyu")) {
+        if (text.equals("/start") || text.equals("🔄 Rolni o'zgartirish") || text.equals("Asosiy menyu") || text.equals("🏠 Asosiy menyu")) {
             userRoles.put(chatId, UserRole.NONE);
             sendRoleSelectionMenu(chatId, "Hush kelibsiz! Rolingizni tanlang:");
             return;
         }
 
-        // Til tanlash (Inline Keyboard) uchun
         if (text.equals("/language") || text.equals("🌐 Til") || text.equals("🌐 Язык") || text.equals("🌐 Language")) {
             sendLanguageSelectionMenu(chatId);
             return;
         }
 
-        // Rol tanlanganda
         if (text.contains("Employer (Ish beruvchi)") || text.contains("Ish beruvchi (Employer)")) {
             userRoles.put(chatId, UserRole.EMPLOYER);
         } else if (text.contains("JobSeeker (Ish izlovchi)") || text.contains("Ish izlovchi (JobSeeker)")) {
@@ -321,7 +344,6 @@ public class Telegram extends TelegramLongPollingBot {
 
         UserRole role = userRoles.getOrDefault(chatId, UserRole.NONE);
 
-        // Tanlangan roliga muvofiq handlerga yuborish
         if (role == UserRole.EMPLOYER) {
             SendMessage response = employerHandler.handleEmployer(message);
             if (response != null) executeMessage(response);
@@ -333,9 +355,6 @@ public class Telegram extends TelegramLongPollingBot {
         }
     }
 
-    // ============================================
-    // ROL TANLASH MENYUSI (REPLY KEYBOARD)
-    // ============================================
     private void sendRoleSelectionMenu(Long chatId, String text) {
         SendMessage message = new SendMessage(chatId.toString(), text);
         ReplyKeyboardMarkup keyboardMarkup = new ReplyKeyboardMarkup();
@@ -353,9 +372,6 @@ public class Telegram extends TelegramLongPollingBot {
         executeMessage(message);
     }
 
-    // ============================================
-    // TIL TANLASH MENYUSI (INLINE KEYBOARD)
-    // ============================================
     private void sendLanguageSelectionMenu(Long chatId) {
         SendMessage message = new SendMessage();
         message.setChatId(chatId.toString());
@@ -365,9 +381,6 @@ public class Telegram extends TelegramLongPollingBot {
         executeMessage(message);
     }
 
-    // ============================================
-    // INLINE KEYBOARD (TIL TANLASH)
-    // ============================================
     private InlineKeyboardMarkup getLanguageInlineKeyboard() {
         InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
         List<List<InlineKeyboardButton>> rows = new ArrayList<>();
@@ -391,9 +404,6 @@ public class Telegram extends TelegramLongPollingBot {
         return markup;
     }
 
-    // ============================================
-    // KATEGORIYA NOMINI OLISH
-    // ============================================
     private String getCategoryName(String key) {
         return switch (key) {
             case "it" -> "💻 IT & Dasturlash";
@@ -411,14 +421,19 @@ public class Telegram extends TelegramLongPollingBot {
         };
     }
 
-    // ============================================
-    // XABAR YUBORISH
-    // ============================================
     private void executeMessage(SendMessage message) {
         try {
             execute(message);
         } catch (TelegramApiException e) {
             log.error("❌ Xatolik: {}", e.getMessage());
+        }
+    }
+
+    private void executeEditMessage(EditMessageText message) {
+        try {
+            execute(message);
+        } catch (TelegramApiException e) {
+            log.error("❌ Edit Message Xatolik: {}", e.getMessage());
         }
     }
 }
