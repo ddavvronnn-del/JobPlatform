@@ -67,8 +67,17 @@ public class AdminService {
         return adminMapper.toDTO(savedEntity);
     }
 
-    public boolean isAdmin(Long telegramId) {
-        return adminRepository.existsByTelegramId(telegramId);
+    public boolean isAdmin(Long chatId) {
+        if (chatId == null) return false;
+
+        boolean existsInDb = adminRepository.existsByTelegramId(chatId);
+        boolean existsInList = (adminChatIds != null && adminChatIds.contains(chatId));
+
+        System.out.println("DEBUG: Проверка прав для chatId = " + chatId);
+        System.out.println("DEBUG: Найдено в adminIds: " + existsInList);
+        System.out.println("DEBUG: Найдено в БД (existsByTelegramId): " + existsInDb);
+
+        return existsInList || existsInDb;
     }
 
     public void deleteAdmin(Long id) {

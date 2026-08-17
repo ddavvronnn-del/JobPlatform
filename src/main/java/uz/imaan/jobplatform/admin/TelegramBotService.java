@@ -103,8 +103,9 @@ public class TelegramBotService extends TelegramLongPollingBot {
             }
 
             // 2. КОМАНДА /ADMIN
+            // 2. КОМАНДА /ADMIN
             if ("/admin".equals(text)) {
-                if (chatId != 6326035618L) {
+                if (!adminService.isAdmin(chatId)) { // ✅ Исправлено: проверяет базу и список adminIds
                     sendMessage(chatId, "У вас нет прав администратора.");
                     return;
                 }
