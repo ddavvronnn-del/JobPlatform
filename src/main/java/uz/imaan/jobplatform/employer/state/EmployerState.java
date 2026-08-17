@@ -2,6 +2,7 @@ package uz.imaan.jobplatform.employer.state;
 
 public enum EmployerState {
         MAIN_MENU,
+        EMPLOYER_MAIN_MENU,
         WAITING_FOR_REG_FULL_NAME,
         WAITING_FOR_REG_AGE,
         WAITING_FOR_REG_PASSPORT,

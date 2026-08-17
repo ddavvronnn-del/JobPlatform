@@ -7,24 +7,26 @@ import uz.imaan.jobplatform.employer.dto.EmployerResponseDTO;
 
 @Component
 public class EmployerMapper {
+
     public EmployerEntity toEntity(EmployerCreateDTO dto) {
         if (dto == null) return null;
 
         return EmployerEntity.builder()
-                .employerChatId(dto.getEmployerChatId())
-                .inn(dto.getInn())
-                .passportSeriesNumber(dto.getPassportSeriesNumber())
-                .phoneNumber(dto.getPhoneNumber())
-                .category(dto.getCategory())
-                .jobType(dto.getJobType())
-                .salary(dto.getSalary())
-                .workHours(dto.getWorkHours())
-                .jobDate(dto.getJobDate())
-                .workerCount(dto.getWorkerCount())
-                .requirements(dto.getRequirements())
-                .foodProvided(dto.getFoodProvided())
-                .latitude(dto.getLatitude())
-                .longitude(dto.getLongitude())
+                .employerChatId(dto.employerChatId())
+                .inn(dto.inn())
+                .passportSeriesNumber(dto.passportSeriesNumber())
+                .phoneNumber(dto.phoneNumber())
+                .title(dto.title()) // 📌 Title qo'shildi
+                .category(dto.category())
+                .jobType(dto.jobType())
+                .salary(dto.salary())
+                .workHours(dto.workHours())
+                .jobDate(dto.jobDate())
+                .workerCount(dto.workerCount())
+                .requirements(dto.requirements())
+                .foodProvided(dto.foodProvided())
+                .latitude(dto.latitude())
+                .longitude(dto.longitude())
                 .build();
     }
 
@@ -38,6 +40,7 @@ public class EmployerMapper {
                 .passportSeriesNumber(entity.getPassportSeriesNumber())
                 .fullName(entity.getFullName())
                 .phoneNumber(entity.getPhoneNumber())
+                .title(entity.getTitle()) // 📌 Title qo'shildi
                 .category(entity.getCategory())
                 .jobType(entity.getJobType())
                 .salary(entity.getSalary())

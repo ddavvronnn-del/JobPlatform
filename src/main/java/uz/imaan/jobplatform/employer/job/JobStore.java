@@ -10,13 +10,15 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 @Component
-@RequiredArgsConstructor  // ✅ Repository ni constructor orqali oladi
+@RequiredArgsConstructor
 public class JobStore {
 
-    private final JobVacancyRepository vacancyRepository;  // ✅ Repository qo'shildi
+    private final JobVacancyRepository vacancyRepository;
 
     private final Map<Long, EmployerState> userStates = new ConcurrentHashMap<>();
-    private final Map<Long, EmployerCreateDTO> draftJobs = new ConcurrentHashMap<>();
+
+    // Record immutable bo'lgani uchun Builder saqlaymiz
+    private final Map<Long, EmployerCreateDTO.EmployerCreateDTOBuilder> draftBuilders = new ConcurrentHashMap<>();
 
     public EmployerState getState(Long chatId) {
         return userStates.getOrDefault(chatId, EmployerState.NONE);
@@ -26,8 +28,8 @@ public class JobStore {
         userStates.put(chatId, state);
     }
 
-    public EmployerCreateDTO getDraft(Long chatId) {
-        return draftJobs.computeIfAbsent(chatId, k -> new EmployerCreateDTO());
+    public EmployerCreateDTO.EmployerCreateDTOBuilder getBuilder(Long chatId) {
+        return draftBuilders.computeIfAbsent(chatId, k -> EmployerCreateDTO.builder());
     }
 
     // ============================================
@@ -35,16 +37,16 @@ public class JobStore {
     // ============================================
 
     public void addVacancy(JobVacancy vacancy) {
-        vacancyRepository.save(vacancy);  // ✅ Bazaga saqlaydi
+        vacancyRepository.save(vacancy);
         System.out.println("✅ Vakansiya saqlandi: " + vacancy.getTitle());
     }
 
     public List<JobVacancy> getAllVacancies() {
-        return vacancyRepository.findAll();  // ✅ Bazadan o'qiydi
+        return vacancyRepository.findAll();
     }
 
     public List<JobVacancy> getVacanciesByEmployer(Long employerChatId) {
-        return vacancyRepository.findByEmployerChatId(employerChatId);  // ✅ Bazadan o'qiydi
+        return vacancyRepository.findByEmployerChatId(employerChatId);
     }
 
     public void deleteVacancy(Long id) {
@@ -53,6 +55,6 @@ public class JobStore {
 
     public void clear(Long chatId) {
         userStates.remove(chatId);
-        draftJobs.remove(chatId);
+        draftBuilders.remove(chatId);
     }
 }
