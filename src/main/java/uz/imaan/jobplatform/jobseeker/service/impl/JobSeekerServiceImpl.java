@@ -73,12 +73,12 @@ public class JobSeekerServiceImpl implements JobSeekerService {
     @Override
     @Transactional
     public JobApplication applyForJob(Long userId, ApplyJobRequest request) {
-        log.info("📝 Ariza topshirish: userId={}, jobId={}", userId, request.getJobId());
+        log.info("📝 Ariza topshirish: userId={}, jobId={}", userId, request.jobId());
 
         JobSeekerProfile profile = profileRepository.findByUserId(userId)
                 .orElseThrow(() -> new RuntimeException("Ishchi profili topilmadi: " + userId));
 
-        if (applicationRepository.existsByJobIdAndJobSeekerId(request.getJobId(), profile.getId())) {
+        if (applicationRepository.existsByJobIdAndJobSeekerId(request.jobId(), profile.getId())) {
             throw new IllegalStateException("Siz ushbu ishga allaqachon ariza yuborgansiz!");
         }
 
@@ -89,9 +89,9 @@ public class JobSeekerServiceImpl implements JobSeekerService {
         }
 
         JobApplication application = JobApplication.builder()
-                .jobId(request.getJobId())
+                .jobId(request.jobId())
                 .jobSeekerId(profile.getId())
-                .coverLetter(request.getComment())
+                .coverLetter(request.comment())
                 .status(JobApplication.ApplicationStatus.PENDING)
                 .build();
 
@@ -110,20 +110,21 @@ public class JobSeekerServiceImpl implements JobSeekerService {
     @Override
     @Transactional(readOnly = true)
     public List<JobApplicationDto> getMyApplications(Long userId) {
-        log.info("📋 Arizalar ro'yxati (list): userId={}", userId);
+        log.info("Arizalar ro'yxati (list): userId={}", userId);
+
         JobSeekerProfile profile = profileRepository.findByUserId(userId)
                 .orElseThrow(() -> new RuntimeException("Ishchi profili topilmadi: " + userId));
 
         return applicationRepository.findByJobSeekerId(profile.getId())
                 .stream()
-                .map(application -> JobApplicationDto.builder()
-                        .id(application.getId())
-                        .jobId(application.getJobId())
-                        .jobSeekerId(application.getJobSeekerId())
-                        .status(application.getStatus().name())
-                        .coverLetter(application.getCoverLetter())
-                        .appliedAt(application.getCreatedAt())
-                        .build())
+                .map(application -> new JobApplicationDto(
+                        application.getId(),                      // DTO id (ariza ID)
+                        application.getJobId(),             // jobId (ish e'lonining ID si)
+                        profile.getId(),                          // jobSeekerId (yoki application.getJobSeeker().getId())
+                        application.getStatus().name(),           // status
+                        application.getCreatedAt(),               // appliedAt
+                        application.getCoverLetter()              // coverLetter
+                ))
                 .collect(Collectors.toList());
     }
 
@@ -188,17 +189,19 @@ public class JobSeekerServiceImpl implements JobSeekerService {
             resumeRepository.save(oldResume);
         }
 
+
+        // Yangi rezyume yaratish
         Resume resume = Resume.builder()
                 .jobSeekerId(profile.getId())
-                .title(request.getTitle())
-                .fullName(request.getFullName())
-                .email(request.getEmail())
-                .phoneNumber(request.getPhoneNumber())
-                .profession(request.getProfession())
-                .experience(request.getExperience())
-                .education(request.getEducation())
-                .skills(request.getSkills())
-                .about(request.getAbout())
+                .title(request.title())
+                .fullName(request.fullName())
+                .email(request.email())
+                .phoneNumber(request.phoneNumber())
+                .profession(request.profession())
+                .experience(request.experience())
+                .education(request.education())
+                .skills(request.skills())
+                .about(request.about())
                 .isActive(true)
                 .build();
 
@@ -218,15 +221,15 @@ public class JobSeekerServiceImpl implements JobSeekerService {
         Resume resume = resumeRepository.findByIdAndJobSeekerId(resumeId, profile.getId())
                 .orElseThrow(() -> new RuntimeException("Rezyume topilmadi!"));
 
-        if (request.getTitle() != null) resume.setTitle(request.getTitle());
-        if (request.getFullName() != null) resume.setFullName(request.getFullName());
-        if (request.getEmail() != null) resume.setEmail(request.getEmail());
-        if (request.getPhoneNumber() != null) resume.setPhoneNumber(request.getPhoneNumber());
-        if (request.getProfession() != null) resume.setProfession(request.getProfession());
-        if (request.getExperience() != null) resume.setExperience(request.getExperience());
-        if (request.getEducation() != null) resume.setEducation(request.getEducation());
-        if (request.getSkills() != null) resume.setSkills(request.getSkills());
-        if (request.getAbout() != null) resume.setAbout(request.getAbout());
+        if (request.title() != null) resume.setTitle(request.title());
+        if (request.fullName() != null) resume.setFullName(request.fullName());
+        if (request.email() != null) resume.setEmail(request.email());
+        if (request.phoneNumber() != null) resume.setPhoneNumber(request.phoneNumber());
+        if (request.profession() != null) resume.setProfession(request.profession());
+        if (request.experience() != null) resume.setExperience(request.experience());
+        if (request.education() != null) resume.setEducation(request.education());
+        if (request.skills() != null) resume.setSkills(request.skills());
+        if (request.about() != null) resume.setAbout(request.about());
 
         Resume updatedResume = resumeRepository.save(resume);
         log.info("✅ Rezyume yangilandi: resumeId={}", updatedResume.getId());
@@ -325,8 +328,8 @@ public class JobSeekerServiceImpl implements JobSeekerService {
         JobSeekerProfile profile = profileRepository.findByUserId(userId)
                 .orElseThrow(() -> new RuntimeException("Ishchi profili topilmadi: " + userId));
 
-        if (request.getLanguage() != null) {
-            profile.setLanguage(request.getLanguage());
+        if (request.language() != null) {
+            profile.setLanguage(request.language());
         }
 
         profileRepository.save(profile);
@@ -338,21 +341,20 @@ public class JobSeekerServiceImpl implements JobSeekerService {
     // ============================================
 
     private ResumeDto toResumeDto(Resume resume) {
-        return ResumeDto.builder()
-                .id(resume.getId())
-                .title(resume.getTitle())
-                .fullName(resume.getFullName())
-                .email(resume.getEmail())
-                .phoneNumber(resume.getPhoneNumber())
-                .profession(resume.getProfession())
-                .experience(resume.getExperience())
-                .education(resume.getEducation())
-                .skills(resume.getSkills())
-                .about(resume.getAbout())
-                .isActive(resume.getIsActive())
-                .createdAt(resume.getCreatedAt())
-                .updatedAt(resume.getUpdatedAt())
-                .build();
+        return new ResumeDto(
+                resume.getId(),
+                resume.getTitle(),
+                resume.getFullName(),
+                resume.getEmail(),
+                resume.getPhoneNumber(),
+                resume.getProfession(),
+                resume.getExperience(),
+                resume.getEducation(),
+                resume.getSkills(),
+                resume.getAbout(),
+                resume.getIsActive(),
+                resume.getCreatedAt(),
+                resume.getUpdatedAt()
+        );
     }
-
 }

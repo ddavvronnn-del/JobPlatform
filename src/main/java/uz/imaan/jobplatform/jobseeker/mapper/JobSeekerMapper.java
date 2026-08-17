@@ -10,21 +10,20 @@ import org.springframework.stereotype.Component;
 public class JobSeekerMapper {
 
     public JobSeekerProfileDto toDto(JobSeekerProfile entity) {
-        if (entity == null) {
-            return null;
-        }
-        return JobSeekerProfileDto.builder()
-                .id(entity.getId())
-                .userId(entity.getUserId())
-                .fullName(entity.getFullName())
-                .phoneNumber(entity.getPhoneNumber())
-                .profession(entity.getProfession())
-                .rating(entity.getRating())
-                .language(entity.getLanguage())
-                .portfolio(entity.getPortfolio())
-                .walletBalance(entity.getWalletBalance())
-                .passportNumber(entity.getPassportNumber())
-                .build();
+        if (entity == null) return null;
+
+        return new JobSeekerProfileDto(
+                entity.getId(),
+                entity.getUserId(),
+                entity.getFullName(),
+                entity.getPhoneNumber(),
+                entity.getProfession(),
+                entity.getRating(),
+                entity.getLanguage(),
+                entity.getPortfolio(),
+                entity.getWalletBalance(),
+                entity.getPassportNumber()
+        );
     }
 
     public void updateEntityFromDto( UpdateProfileRequest dto, JobSeekerProfile entity) {
@@ -33,23 +32,23 @@ public class JobSeekerMapper {
         }
 
         // Faqat tahrirlanishi mumkin bo'lgan maydonlarni yangilaymiz
-        if (dto.getFullName() != null) {
-            entity.setFullName(dto.getFullName());
+        if (dto.fullName() != null) {
+            entity.setFullName(dto.fullName());
         }
-        if (dto.getPhoneNumber() != null) {
-            entity.setPhoneNumber(dto.getPhoneNumber());
+        if (dto.phoneNumber() != null) {
+            entity.setPhoneNumber(dto.phoneNumber());
         }
-        if (dto.getProfession() != null) {
-            entity.setProfession(dto.getProfession());
+        if (dto.profession() != null) {
+            entity.setProfession(dto.profession());
         }
-        if (dto.getLanguage() != null) {
-            entity.setLanguage(dto.getLanguage());
+        if (dto.language() != null) {
+            entity.setLanguage(dto.language());
         }
-        if (dto.getPortfolio() != null) {
-            entity.setPortfolio(dto.getPortfolio());
+        if (dto.portfolio() != null) {
+            entity.setPortfolio(dto.portfolio());
         }
-        if (dto.getPassportNumber() != null) {
-            entity.setPassportNumber(dto.getPassportNumber());
+        if (dto.passportNumber() != null) {
+            entity.setPassportNumber(dto.passportNumber());
         }
     }
 
