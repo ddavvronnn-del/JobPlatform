@@ -21,11 +21,11 @@ public class JobVacancy {
     private Long employerChatId;
     private String title;
     private String category;
-    private String type;           // setType() uchun
+    private String type;
     private String salary;
-    private String workHours;      // setWorkHours() uchun
-    private Integer workerCount;   // setWorkerCount() uchun
-    private String requirements;   // setRequirements() uchun
-    private String phoneNumber;    // setPhoneNumber() uchun
+    private String workHours;
+    private Integer workerCount;
+    private String requirements;
+    private String phoneNumber;
     private Boolean isActive;
 }

@@ -1,7 +1,7 @@
 package uz.imaan.jobplatform.telegram;
 
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Component;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
 import org.telegram.telegrambots.meta.api.objects.CallbackQuery;
@@ -17,6 +17,9 @@ import uz.imaan.jobplatform.employer.job.JobVacancy;
 import uz.imaan.jobplatform.employer.job.JobVacancyRepository;
 import uz.imaan.jobplatform.employer.repository.EmployerRepository;
 import uz.imaan.jobplatform.employer.state.EmployerState;
+import uz.imaan.jobplatform.jobseeker.entity.Subscription;
+import uz.imaan.jobplatform.jobseeker.repository.SubscriptionRepository;
+
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
@@ -25,14 +28,27 @@ import java.util.concurrent.ConcurrentHashMap;
 
 @Slf4j
 @Component
-@RequiredArgsConstructor
 public class EmployerHandler {
 
     private final EmployerRepository employerRepository;
     private final JobVacancyRepository jobVacancyRepository;
+    private final SubscriptionRepository subscriptionRepository;
+    private final Telegram telegram;
 
     private final Map<Long, EmployerState> states = new ConcurrentHashMap<>();
     private final Map<Long, Map<String, String>> draftData = new ConcurrentHashMap<>();
+
+    // Circular dependency (doiraviy bog'liqlik) xatoligini oldini olish uchun @Lazy qo'shildi
+    public EmployerHandler(
+            EmployerRepository employerRepository,
+            JobVacancyRepository jobVacancyRepository,
+            SubscriptionRepository subscriptionRepository,
+            @Lazy Telegram telegram) {
+        this.employerRepository = employerRepository;
+        this.jobVacancyRepository = jobVacancyRepository;
+        this.subscriptionRepository = subscriptionRepository;
+        this.telegram = telegram;
+    }
 
     public SendMessage handleEmployer(Message message) {
         if (message == null) return null;
@@ -198,7 +214,7 @@ public class EmployerHandler {
             String reqText = isSkip(text) ? (lang.equals("ru") ? "Не указано" : "Ko'rsatilmadi") : text;
             draftData.get(chatId).put("requirements", reqText);
             states.put(chatId, EmployerState.WAITING_FOR_PHONE);
-            return createMessage(chatId, getText(lang, "📌 **Talablarni kiriting yoki O'tkazib yuboring:**", "📌 **Введите требования или пропустите:**"), getSkipKeyboard(lang));
+            return createMessage(chatId, getText(lang, "📞 **Telefon raqamingizni yuboring:**", "📞 **Отправьте номер телефона:**"), getContactKeyboard(lang));
         }
 
         if (state == EmployerState.WAITING_FOR_PHONE) {
@@ -229,6 +245,41 @@ public class EmployerHandler {
             vacancy.setIsActive(true);
 
             jobVacancyRepository.save(vacancy);
+
+            // ====== OBUNACHILARGA XABAR YO'NATISH ======
+            try {
+                String postedCategory = vacancy.getCategory();
+                List<Subscription> subscribers = subscriptionRepository.findByCategory(postedCategory);
+
+                for (Subscription sub : subscribers) {
+                    Long seekerUserId = sub.getUserId();
+
+                    String notificationText = String.format(
+                            "🆕 **Yangi ish qo'shildi!**\n\n" +
+                                    "📌 **Vakansiya:** %s\n" +
+                                    "📂 **Kategoriya:** %s\n" +
+                                    "⏰ **Ish turi:** %s\n" +
+                                    "💰 **Maosh:** %s\n" +
+                                    "📞 **Tel:** %s",
+                            vacancy.getTitle(),
+                            vacancy.getCategory() != null ? vacancy.getCategory() : "Ko'rsatilmagan",
+                            vacancy.getType() != null ? vacancy.getType() : "To'liq kun",
+                            vacancy.getSalary() != null ? vacancy.getSalary() : "Kelishiladi",
+                            vacancy.getPhoneNumber() != null ? vacancy.getPhoneNumber() : "Ko'rsatilmagan"
+                    );
+
+                    SendMessage notificationMsg = new SendMessage(seekerUserId.toString(), notificationText);
+                    notificationMsg.setParseMode("Markdown");
+
+                    try {
+                        telegram.execute(notificationMsg);
+                    } catch (Exception e) {
+                        log.error("❌ Xabar yuborishda xatolik: userId={}", seekerUserId);
+                    }
+                }
+            } catch (Exception e) {
+                log.error("❌ Obunachilarga xabar yuborishda umumiy xatolik", e);
+            }
 
             states.put(chatId, EmployerState.MAIN_MENU);
             draftData.get(chatId).clear();
@@ -282,7 +333,7 @@ public class EmployerHandler {
     }
 
     // ============================================
-    // RO'YXATDAN O'TISH (ISM, YOSH, PASPORT, TELEFON)
+    // RO'YXATDAN O'TISH
     // ============================================
     private SendMessage handleRegistration(Long chatId, String text, Message message, String lang, Optional<EmployerEntity> profileOpt) {
         EmployerState regState = states.getOrDefault(chatId, EmployerState.WAITING_FOR_REG_FULL_NAME);
@@ -346,7 +397,7 @@ public class EmployerHandler {
     }
 
     // ============================================
-    // BILDIRISHNOMA YUBORISH (NOTIFICATION)
+    // BILDIRISHNOMA YUBORISH
     // ============================================
     public SendMessage buildApplicationNotification(
             Long employerChatId,
@@ -385,7 +436,7 @@ public class EmployerHandler {
     }
 
     // ============================================
-    // PROFIL VA VAKANSIYALARni KO'RSATISH
+    // PROFIL VA VAKANSIYALARNI KO'RSATISH
     // ============================================
     private SendMessage showProfile(Long chatId, Optional<EmployerEntity> profileOpt, String lang) {
         if (profileOpt.isEmpty() || profileOpt.get().getFullName() == null || profileOpt.get().getFullName().toLowerCase().contains("employer")) {
