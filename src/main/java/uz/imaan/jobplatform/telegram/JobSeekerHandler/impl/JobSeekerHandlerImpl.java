@@ -1793,18 +1793,25 @@ public class JobSeekerHandlerImpl implements JobSeekerHandler {
             );
             return createMessage(chatId, msg, getMainMenuKeyboard(profileOpt));
         }
+        // 3. Oldingi bosqichda saqlangan karta raqamini olish
+        Map<String, String> userData = data.get(chatId);
+        String cardNumber = userData.get("cardNumber");
 
-        String cardNumber = data.get(chatId).get("cardNumber");
+        if (cardNumber == null || cardNumber.isEmpty()) {
+            return createMessage(chatId, "Karta raqami topilmadi. Iltimos, /start dan qayta boshlang.", getMainMenuKeyboard(profileOpt));
+        }
+
         try {
-            BankCardRequest request = new BankCardRequest();
-            request.setCardNumber(cardNumber);
-            request.setExpireDate("12/99");
-            request.setCardHolderName(text.toUpperCase());
+            BankCardRequest request = new BankCardRequest(cardNumber, text.toUpperCase());
+
+            // 5. Kartani tizimga qo'shish
             walletService.addBankCard(chatId, request);
 
+            // 6. Holatni o'zgartirish va vaqtinchalik ma'lumotlarni tozalash
             states.put(chatId, JobSeekerState.WALLET_MENU);
-            data.get(chatId).remove("cardNumber");
+            userData.remove("cardNumber");
 
+            // 7. Foydalanuvchiga muvaffaqiyatli xabar yuborish
             String msg = getText(profileOpt, chatId,
                     "✅ Karta muvaffaqiyatli qo'shildi!\n\n💳 Karta: " + cardNumber + "\n👤 Egasi: " + text.toUpperCase(),
                     "✅ Karta muvaffaqiyatli qo'shildi!\n\n💳 Karta: " + cardNumber + "\n👤 Egasi: " + text.toUpperCase(),

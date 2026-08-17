@@ -45,27 +45,25 @@ public class WalletServiceImpl implements WalletService {
                 .orElseThrow(() -> new RuntimeException("Ishchi profili topilmadi: " + userId));
 
         // 1. Karta raqamini tekshirish
-        if (request.getCardNumber() == null || request.getCardNumber().length() != 16) {
+        if (request.cardNumber() == null || request.cardNumber().length() != 16) {
             throw new IllegalArgumentException("Karta raqami 16 ta raqamdan iborat bo'lishi kerak!");
         }
 
-        if (!request.getCardNumber().matches("\\d+")) {
+        if (!request.cardNumber().matches("\\d+")) {
             throw new IllegalArgumentException("Karta raqami faqat raqamlardan iborat bo'lishi kerak!");
         }
 
         // 2. Karta oldin ro'yxatdan o'tmaganligini tekshirish
-        if (bankCardRepository.existsByCardNumber(request.getCardNumber())) {
+        if (bankCardRepository.existsByCardNumber(request.cardNumber())) {
             throw new RuntimeException("Bu karta allaqachon ro'yxatdan o'tgan!");
         }
 
-        // 3. Karta muddatini tekshirish
-        validateExpireDate(request.getExpireDate());
+
 
         // 4. Kartani saqlash
         BankCard bankCard = BankCard.builder()
-                .cardNumber(request.getCardNumber())
-                .expireDate(request.getExpireDate())
-                .cardHolderName(request.getCardHolderName().toUpperCase())
+                .cardNumber(request.cardNumber())
+                .cardHolderName(request.cardHolderName().toUpperCase())
                 .jobSeeker(profile)
                 .isActive(true)
                 .build();

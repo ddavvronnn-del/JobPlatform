@@ -157,7 +157,7 @@ public class JobSeekerController {
     public ResponseEntity<JobApplication> applyForJob(
             @RequestHeader("X-User-Id") Long userId,
             @Valid @RequestBody ApplyJobRequest request) {
-        log.info("POST /api/v1/job-seeker/apply - userId: {}, jobId: {}", userId, request.getJobId());
+        log.info("POST /api/v1/job-seeker/apply - userId: {}, jobId: {}", userId, request.jobId());
         JobApplication response = jobSeekerService.applyForJob(userId, request);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }

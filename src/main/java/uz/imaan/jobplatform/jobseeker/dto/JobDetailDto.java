@@ -1,20 +1,20 @@
 package uz.imaan.jobplatform.jobseeker.dto;
 
-import lombok.Data;
+
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
 
 
-@Data
-public class JobDetailDto {
-    private Long id;
-    private String title;
-    private BigDecimal salary;      // To'lovi
-    private LocalDate date;         // Sana
-    private String location;       // Manzil
-    private String requirements;   // Talablar
-    private Long employerId;
-    private String employerName;
-    private Double employerRating; // Ish beruvchi reytingi
-}
+
+public record JobDetailDto (
+     Long id,
+     String title,
+     BigDecimal salary,      // To'lovi
+     LocalDate date,         // Sana
+     String location,       // Manzil
+     String requirements,   // Talablar
+     Long employerId,
+     String employerName,
+     Double employerRating // Ish beruvchi reytingi
+){}

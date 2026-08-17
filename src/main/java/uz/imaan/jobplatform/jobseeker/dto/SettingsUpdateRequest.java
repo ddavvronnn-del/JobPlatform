@@ -5,13 +5,11 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 
-@Data
-@NoArgsConstructor
-@AllArgsConstructor
-public class SettingsUpdateRequest {
 
-    private String language;
-    private Boolean notificationsEnabled;
-    private Boolean profileHidden;
+public record SettingsUpdateRequest (
 
-}
+    String language,
+    Boolean notificationsEnabled,
+    Boolean profileHidden
+
+){}
