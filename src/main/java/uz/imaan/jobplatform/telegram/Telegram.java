@@ -6,12 +6,14 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.telegram.telegrambots.bots.TelegramLongPollingBot;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
+import org.telegram.telegrambots.meta.api.methods.updatingmessages.EditMessageText;
 import org.telegram.telegrambots.meta.api.objects.CallbackQuery;
 import org.telegram.telegrambots.meta.api.objects.Message;
 import org.telegram.telegrambots.meta.api.objects.Update;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.ReplyKeyboardMarkup;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardButton;
+import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.KeyboardButton;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.KeyboardRow;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 import uz.imaan.jobplatform.employer.job.JobStore;
@@ -21,7 +23,6 @@ import uz.imaan.jobplatform.jobseeker.entity.JobSeekerProfile;
 import uz.imaan.jobplatform.jobseeker.repository.JobApplicationRepository;
 import uz.imaan.jobplatform.jobseeker.repository.JobSeekerProfileRepository;
 import uz.imaan.jobplatform.telegram.JobSeekerHandler.interfaces.JobSeekerHandler;
-
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -53,7 +54,7 @@ public class Telegram extends TelegramLongPollingBot {
             JobStore jobStore,
             JobSeekerProfileRepository jobSeekerProfileRepository,
             JobApplicationRepository jobApplicationRepository,
-            @Value("${telegram.bot.token}") String botToken) {
+            @Value("${telegram.bot.token:8449248126:AAFPgTpsBD2o1k_cp8YbG8_wqp9o8KnRCss}") String botToken) {
         super(botToken);
         this.jobSeekerHandler = jobSeekerHandler;
         this.employerHandler = employerHandler;
@@ -82,13 +83,63 @@ public class Telegram extends TelegramLongPollingBot {
             log.info("📩 Callback: chatId={}, data={}", chatId, callbackData);
 
             try {
-                // TIL TANLASH
+                // ============================================
+                // ISH BERUVCHI KATEGORIYA CALLBACK'LARI (emp_cat_)
+                // ============================================
+                if (callbackData != null && callbackData.startsWith("emp_cat_")) {
+                    SendMessage response = employerHandler.handleCallback(callbackQuery);
+                    if (response != null) {
+                        executeMessage(response);
+                    }
+                    return;
+                }
+
+                // ============================================
+                // ARIZANI QABUL QILISH VA RAD ETISH
+                // ============================================
+                if (callbackData.startsWith("accept_app_") || callbackData.startsWith("reject_app_")) {
+                    boolean isAccept = callbackData.startsWith("accept_app_");
+                    String prefix = isAccept ? "accept_app_" : "reject_app_";
+                    String[] parts = callbackData.replace(prefix, "").split("_");
+
+                    Long appId = Long.parseLong(parts[0]);
+                    Long seekerChatId = Long.parseLong(parts[1]);
+                    Integer messageId = callbackQuery.getMessage().getMessageId();
+
+                    // Database holatini yangilash
+                    Optional<JobApplication> appOpt = jobApplicationRepository.findById(appId);
+                    if (appOpt.isPresent()) {
+                        JobApplication app = appOpt.get();
+                        app.setStatus(isAccept ? JobApplication.ApplicationStatus.ACCEPTED : JobApplication.ApplicationStatus.REJECTED);
+                        jobApplicationRepository.save(app);
+                    }
+
+                    // 1. Ish beruvchi xabarini tahrirlash (tugmalarni olib tashlab status yozish)
+                    EditMessageText editMsg = new EditMessageText();
+                    editMsg.setChatId(chatId.toString());
+                    editMsg.setMessageId(messageId);
+                    editMsg.setText(isAccept ? "✅ **Ushbu ariza qabul qilindi!**" : "❌ **Ushbu ariza rad etildi.**");
+                    editMsg.setParseMode("Markdown");
+                    executeEditMessage(editMsg);
+
+                    // 2. Nomzod (JobSeeker) ga bildirishnoma yuborish
+                    String seekerText = isAccept ?
+                            "🎉 **Xushxabar!** Sizning arizangiz ish beruvchi tomonidan qabul qilindi. Tez orada siz bilan bog'lanishadi!" :
+                            "😔 **Afsuski**, sizning arizangiz ish beruvchi tomonidan rad etildi.";
+
+                    SendMessage seekerMsg = new SendMessage(seekerChatId.toString(), seekerText);
+                    seekerMsg.setParseMode("Markdown");
+                    executeMessage(seekerMsg);
+
+                    return;
+                }
+
+                // ============================================
+                // TIL TANLASH (lang_uz, lang_ru, lang_en)
+                // ============================================
                 if (callbackData.startsWith("lang_")) {
                     String language = callbackData.replace("lang_", "");
                     jobSeekerHandler.updateLanguage(chatId, language);
-
-                    // Yangilangan profilni olish (hali mavjud bo'lmasligi mumkin)
-                    Optional<JobSeekerProfile> updatedProfile = jobSeekerProfileRepository.findByUserId(chatId);
 
                     String responseText = switch (language) {
                         case "uz" -> "✅ Til O'zbek tiliga o'zgartirildi!";
@@ -99,18 +150,23 @@ public class Telegram extends TelegramLongPollingBot {
 
                     SendMessage response = new SendMessage();
                     response.setChatId(chatId.toString());
-                    response.setText(responseText + "\n\n" + "Hush kelibsiz! Rolingizni tanlang:");
-                    response.setReplyMarkup(getRoleSelectionKeyboard(updatedProfile));
+                    response.setText(responseText);
+                    response.setReplyMarkup(null);
                     executeMessage(response);
                     return;
                 }
 
-                // KATEGORIYA TANLASH
+                // ============================================
+                // KATEGORIYA TANLASH (VAKANSIYALARNI KO'RSATISH)
+                // ============================================
                 if (callbackData.startsWith("category_")) {
                     String categoryKey = callbackData.replace("category_", "");
                     String categoryName = getCategoryName(categoryKey);
 
                     List<JobVacancy> allVacancies = jobStore.getAllVacancies();
+
+                    log.info("📋 Barcha vakansiyalar soni: {}", allVacancies.size());
+
                     List<JobVacancy> vacancies;
                     if (categoryKey.equals("all")) {
                         vacancies = allVacancies;
@@ -120,6 +176,8 @@ public class Telegram extends TelegramLongPollingBot {
                                         v.getCategory().toLowerCase().contains(categoryName.toLowerCase()))
                                 .toList();
                     }
+
+                    log.info("🔍 Kategoriya: {}, topilgan: {} ta", categoryName, vacancies.size());
 
                     if (vacancies.isEmpty()) {
                         String msg = "🔍 Ushbu kategoriya bo'yicha hozircha vakansiyalar mavjud emas.";
@@ -131,6 +189,7 @@ public class Telegram extends TelegramLongPollingBot {
                         return;
                     }
 
+                    // VAKANSIYALARNI KO'RSATISH
                     String titleMsg = "💼 **Topilgan vakansiyalar (" + vacancies.size() + "):**";
                     SendMessage titleResponse = new SendMessage();
                     titleResponse.setChatId(chatId.toString());
@@ -140,7 +199,10 @@ public class Telegram extends TelegramLongPollingBot {
 
                     for (JobVacancy vacancy : vacancies) {
                         String vacancyText = String.format(
-                                "📌 **%s**\n📂 Kategoriya: %s\n💼 Turi: %s\n💰 Maosh: %s",
+                                "📌 **%s**\n" +
+                                        "📂 Kategoriya: %s\n" +
+                                        "💼 Turi: %s\n" +
+                                        "💰 Maosh: %s",
                                 vacancy.getTitle(),
                                 vacancy.getCategory() != null ? vacancy.getCategory() : "Ko'rsatilmagan",
                                 vacancy.getType() != null ? vacancy.getType() : "Ko'rsatilmagan",
@@ -184,7 +246,9 @@ public class Telegram extends TelegramLongPollingBot {
                     return;
                 }
 
-                // ORQAGA (kategoriyalarga)
+                // ============================================
+                // ORQAGA (Kategoriyalarga qaytish)
+                // ============================================
                 if (callbackData.equals("back_to_categories")) {
                     SendMessage response = new SendMessage();
                     response.setChatId(chatId.toString());
@@ -195,9 +259,12 @@ public class Telegram extends TelegramLongPollingBot {
                     return;
                 }
 
-                // ARIZA TOPSHIRISH
+                // ============================================
+                // ARIZA TOPSHIRISH (apply_123)
+                // ============================================
                 if (callbackData.startsWith("apply_")) {
                     Long vacancyId = Long.parseLong(callbackData.replace("apply_", ""));
+
                     Optional<JobSeekerProfile> profileOpt = jobSeekerProfileRepository.findByUserId(chatId);
                     if (profileOpt.isEmpty()) {
                         SendMessage response = new SendMessage();
@@ -209,7 +276,9 @@ public class Telegram extends TelegramLongPollingBot {
 
                     JobVacancy vacancy = jobStore.getAllVacancies().stream()
                             .filter(v -> v.getId().equals(vacancyId))
-                            .findFirst().orElse(null);
+                            .findFirst()
+                            .orElse(null);
+
                     if (vacancy == null) {
                         SendMessage response = new SendMessage();
                         response.setChatId(chatId.toString());
@@ -218,31 +287,27 @@ public class Telegram extends TelegramLongPollingBot {
                         return;
                     }
 
+                    // Arizani bazaga saqlash
                     JobSeekerProfile profile = profileOpt.get();
                     JobApplication application = new JobApplication();
                     application.setJobId(vacancy.getId());
                     application.setJobSeekerId(profile.getId());
                     application.setCoverLetter("Ariza topshirildi");
                     application.setStatus(JobApplication.ApplicationStatus.PENDING);
-                    jobApplicationRepository.save(application);
+                    JobApplication savedApp = jobApplicationRepository.save(application);
 
+                    // Ish beruvchiga Qabul qilish / Rad etish tugmalari bilan bildirishnoma yuborish
                     Long employerChatId = vacancy.getEmployerChatId();
                     if (employerChatId != null) {
-                        String notifyText = String.format(
-                                "📩 **Vakansiyangizga yangi ariza keldi!**\n\n" +
-                                        "📌 **Vakansiya:** %s\n" +
-                                        "👤 **Nomzod:** %s\n" +
-                                        "🪪 **Pasport:** %s\n" +
-                                        "📞 **Tel:** %s\n" +
-                                        "📝 **Tajriba:** %s",
+                        SendMessage notifyMsg = employerHandler.buildApplicationNotification(
+                                employerChatId,
+                                savedApp.getId(),
+                                chatId,
                                 vacancy.getTitle(),
                                 profile.getFullName() != null ? profile.getFullName() : "Kiritilmagan",
-                                profile.getPassportNumber() != null ? profile.getPassportNumber() : "Kiritilmagan",
                                 profile.getPhoneNumber() != null ? profile.getPhoneNumber() : "Kiritilmagan",
-                                profile.getExperience() != null ? profile.getExperience() : "Kiritilmagan"
+                                "uz"
                         );
-                        SendMessage notifyMsg = new SendMessage(employerChatId.toString(), notifyText);
-                        notifyMsg.setParseMode("Markdown");
                         executeMessage(notifyMsg);
                     }
 
@@ -270,35 +335,20 @@ public class Telegram extends TelegramLongPollingBot {
 
         log.info("📩 Xabar: chatId={}, text={}", chatId, text);
 
-        // ============================================
-        // /start yoki "🔄 Rolni o'zgartirish"
-        // ============================================
-        if (text.equals("/start") || text.equals("🔄 Rolni o'zgartirish") || text.equals("Asosiy menyu")) {
+        if (text.equals("/start") || text.equals("🔄 Rolni o'zgartirish") || text.equals("Asosiy menyu") || text.equals("🏠 Asosiy menyu")) {
             userRoles.put(chatId, UserRole.NONE);
-            // Til allaqachon tanlanganmi?
-            Optional<JobSeekerProfile> profileOpt = jobSeekerProfileRepository.findByUserId(chatId);
-            if (profileOpt.isPresent()) {
-                // Profil mavjud - to'g'ridan-to'g'ri rol tanlash
-                sendRoleSelectionMenu(chatId, "Hush kelibsiz! Rolingizni tanlang:", profileOpt);
-            } else {
-                // Profil mavjud emas - til tanlash
-                sendLanguageSelectionMenu(chatId);
-            }
+            sendRoleSelectionMenu(chatId, "Hush kelibsiz! Rolingizni tanlang:");
             return;
         }
 
-        // TIL TANLASH (inline keyboard orqali)
         if (text.equals("/language") || text.equals("🌐 Til") || text.equals("🌐 Язык") || text.equals("🌐 Language")) {
             sendLanguageSelectionMenu(chatId);
             return;
         }
 
-        // ROL TANLASH
-        if (text.contains("Employer (Ish beruvchi)") || text.contains("Ish beruvchi (Employer)") ||
-                text.contains("Работодатель") || text.equals("Employer")) {
+        if (text.contains("Employer (Ish beruvchi)") || text.contains("Ish beruvchi (Employer)")) {
             userRoles.put(chatId, UserRole.EMPLOYER);
-        } else if (text.contains("JobSeeker (Ish izlovchi)") || text.contains("Ish izlovchi (JobSeeker)") ||
-                text.contains("Соискатель") || text.equals("Job Seeker")) {
+        } else if (text.contains("JobSeeker (Ish izlovchi)") || text.contains("Ish izlovchi (JobSeeker)")) {
             userRoles.put(chatId, UserRole.JOB_SEEKER);
         }
 
@@ -311,50 +361,31 @@ public class Telegram extends TelegramLongPollingBot {
             SendMessage response = jobSeekerHandler.handleJobSeeker(message);
             if (response != null) executeMessage(response);
         } else {
-            // Rol tanlanmagan bo'lsa, til tanlash
-            sendLanguageSelectionMenu(chatId);
+            sendRoleSelectionMenu(chatId, "Iltimos, avval rolingizni tanlang:");
         }
     }
 
-    // ============================================
-    // ROL TANLASH KEYBOARD
-    // ============================================
-    private ReplyKeyboardMarkup getRoleSelectionKeyboard(Optional<JobSeekerProfile> profileOpt) {
-        ReplyKeyboardMarkup markup = new ReplyKeyboardMarkup();
-        markup.setResizeKeyboard(true);
-
-        KeyboardRow row = new KeyboardRow();
-
-        if (profileOpt.isPresent() && "ru".equals(profileOpt.get().getLanguage())) {
-            row.add("Работодатель");
-            row.add("Соискатель");
-        } else if (profileOpt.isPresent() && "en".equals(profileOpt.get().getLanguage())) {
-            row.add("Employer");
-            row.add("Job Seeker");
-        } else {
-            row.add("Employer (Ish beruvchi)");
-            row.add("JobSeeker (Ish izlovchi)");
-        }
-
-        markup.setKeyboard(List.of(row));
-        return markup;
-    }
-
-    private void sendRoleSelectionMenu(Long chatId, String text, Optional<JobSeekerProfile> profileOpt) {
+    private void sendRoleSelectionMenu(Long chatId, String text) {
         SendMessage message = new SendMessage(chatId.toString(), text);
-        message.setReplyMarkup(getRoleSelectionKeyboard(profileOpt));
+        ReplyKeyboardMarkup keyboardMarkup = new ReplyKeyboardMarkup();
+        keyboardMarkup.setResizeKeyboard(true);
+
+        List<KeyboardRow> keyboard = new ArrayList<>();
+        KeyboardRow row = new KeyboardRow();
+        row.add(new KeyboardButton("Employer (Ish beruvchi)"));
+        row.add(new KeyboardButton("JobSeeker (Ish izlovchi)"));
+
+        keyboard.add(row);
+        keyboardMarkup.setKeyboard(keyboard);
+        message.setReplyMarkup(keyboardMarkup);
+
         executeMessage(message);
     }
 
-    // ============================================
-    // TIL TANLASH MENYUSI (INLINE KEYBOARD)
-    // ============================================
     private void sendLanguageSelectionMenu(Long chatId) {
         SendMessage message = new SendMessage();
         message.setChatId(chatId.toString());
-        message.setText("🌐 **Xush kelibsiz! Iltimos, tilni tanlang:**\n\n" +
-                "🌐 **Добро пожаловать! Пожалуйста, выберите язык:**\n\n" +
-                "🌐 **Welcome! Please choose your language:**");
+        message.setText("🌐 **Tilni tanlang / Выберите язык:**");
         message.setParseMode("Markdown");
         message.setReplyMarkup(getLanguageInlineKeyboard());
         executeMessage(message);
@@ -365,18 +396,24 @@ public class Telegram extends TelegramLongPollingBot {
         List<List<InlineKeyboardButton>> rows = new ArrayList<>();
 
         List<InlineKeyboardButton> row1 = new ArrayList<>();
-        row1.add(InlineKeyboardButton.builder().text("🇺🇿 O'zbek").callbackData("lang_uz").build());
-        row1.add(InlineKeyboardButton.builder().text("🇷🇺 Русский").callbackData("lang_ru").build());
-        row1.add(InlineKeyboardButton.builder().text("🇬🇧 English").callbackData("lang_en").build());
+        row1.add(InlineKeyboardButton.builder()
+                .text("🇺🇿 O'zbek")
+                .callbackData("lang_uz")
+                .build());
+        row1.add(InlineKeyboardButton.builder()
+                .text("🇷🇺 Русский")
+                .callbackData("lang_ru")
+                .build());
+        row1.add(InlineKeyboardButton.builder()
+                .text("🇬🇧 English")
+                .callbackData("lang_en")
+                .build());
 
         rows.add(row1);
         markup.setKeyboard(rows);
         return markup;
     }
 
-    // ============================================
-    // KATEGORIYA NOMI
-    // ============================================
     private String getCategoryName(String key) {
         return switch (key) {
             case "it" -> "💻 IT & Dasturlash";
@@ -394,14 +431,19 @@ public class Telegram extends TelegramLongPollingBot {
         };
     }
 
-    // ============================================
-    // XABAR YUBORISH
-    // ============================================
     private void executeMessage(SendMessage message) {
         try {
             execute(message);
         } catch (TelegramApiException e) {
             log.error("❌ Xatolik: {}", e.getMessage());
+        }
+    }
+
+    private void executeEditMessage(EditMessageText message) {
+        try {
+            execute(message);
+        } catch (TelegramApiException e) {
+            log.error("❌ Edit Message Xatolik: {}", e.getMessage());
         }
     }
 }
