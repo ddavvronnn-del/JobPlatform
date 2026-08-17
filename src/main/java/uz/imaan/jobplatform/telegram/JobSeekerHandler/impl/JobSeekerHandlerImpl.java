@@ -17,8 +17,10 @@ import uz.imaan.jobplatform.jobseeker.dto.BankCardRequest;
 import uz.imaan.jobplatform.jobseeker.entity.BankCard;
 import uz.imaan.jobplatform.jobseeker.entity.JobApplication;
 import uz.imaan.jobplatform.jobseeker.entity.JobSeekerProfile;
+import uz.imaan.jobplatform.jobseeker.entity.Subscription;
 import uz.imaan.jobplatform.jobseeker.repository.JobApplicationRepository;
 import uz.imaan.jobplatform.jobseeker.repository.JobSeekerProfileRepository;
+import uz.imaan.jobplatform.jobseeker.repository.SubscriptionRepository;
 import uz.imaan.jobplatform.jobseeker.service.interfaces.WalletService;
 import uz.imaan.jobplatform.telegram.JobSeekerHandler.interfaces.JobSeekerHandler;
 import uz.imaan.jobplatform.telegram.Telegram;
@@ -33,6 +35,8 @@ import java.util.concurrent.ConcurrentHashMap;
 @Component
 @RequiredArgsConstructor
 public class JobSeekerHandlerImpl implements JobSeekerHandler {
+
+    private final SubscriptionRepository subscriptionRepository;
 
     public enum JobSeekerState {
         NONE,
@@ -380,6 +384,17 @@ public class JobSeekerHandlerImpl implements JobSeekerHandler {
             profile.setCategory(profession);
             jobSeekerProfileRepository.save(profile);
 
+            // Kasb o'zgartirilganda obunani ham yangilash
+            if (profile.getCategory() != null) {
+                if (!subscriptionRepository.existsByUserIdAndCategory(profile.getUserId(), profile.getCategory())) {
+                    Subscription subscription = Subscription.builder()
+                            .userId(profile.getUserId()) // Telegram Chat ID
+                            .category(profile.getCategory())
+                            .build();
+                    subscriptionRepository.save(subscription);
+                }
+            }
+
             states.put(chatId, JobSeekerState.PROFILE_MENU);
             String msg = getText(profileOpt, chatId,
                     "✅ Профессия успешно обновлена!\n\n💼 Новая профессия: `" + profession + "`",
@@ -546,6 +561,16 @@ public class JobSeekerHandlerImpl implements JobSeekerHandler {
             profile.setProfession(data.get(chatId).get("profession"));
             profile.setCategory(data.get(chatId).get("category"));
             jobSeekerProfileRepository.save(profile);
+            if (profile.getCategory() != null) {
+                // Agar bu foydalanuvchi bu kategoriyaga oldin obuna bo'lmagan bo'lsa
+                if (!subscriptionRepository.existsByUserIdAndCategory(profile.getUserId(), profile.getCategory())) {
+                    Subscription subscription = Subscription.builder()
+                            .userId(profile.getUserId()) // Telegram Chat ID
+                            .category(profile.getCategory())
+                            .build();
+                    subscriptionRepository.save(subscription);
+                }
+            }
 
             states.put(chatId, JobSeekerState.MAIN_MENU);
             data.remove(chatId);

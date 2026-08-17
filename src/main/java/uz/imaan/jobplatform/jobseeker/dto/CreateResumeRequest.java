@@ -11,7 +11,7 @@ import lombok.NoArgsConstructor;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class CreateResumeRequest {
+public class  CreateResumeRequest {
 
     @NotBlank(message = "Sarlavha kiritilishi shart")
     private String title;           // "Java Developer" (majburiy)

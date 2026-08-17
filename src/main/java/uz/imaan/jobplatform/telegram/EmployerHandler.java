@@ -17,6 +17,9 @@ import uz.imaan.jobplatform.employer.job.JobVacancy;
 import uz.imaan.jobplatform.employer.job.JobVacancyRepository;
 import uz.imaan.jobplatform.employer.repository.EmployerRepository;
 import uz.imaan.jobplatform.employer.state.EmployerState;
+
+
+
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
@@ -30,6 +33,7 @@ public class EmployerHandler {
 
     private final EmployerRepository employerRepository;
     private final JobVacancyRepository jobVacancyRepository;
+
 
     private final Map<Long, EmployerState> states = new ConcurrentHashMap<>();
     private final Map<Long, Map<String, String>> draftData = new ConcurrentHashMap<>();
@@ -229,6 +233,7 @@ public class EmployerHandler {
             vacancy.setIsActive(true);
 
             jobVacancyRepository.save(vacancy);
+
 
             states.put(chatId, EmployerState.MAIN_MENU);
             draftData.get(chatId).clear();
