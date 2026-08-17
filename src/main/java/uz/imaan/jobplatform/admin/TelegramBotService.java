@@ -13,7 +13,7 @@ import org.telegram.telegrambots.meta.api.objects.Update;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardButton;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
-import uz.imaan.jobplatform.admin.dto.AdminDTO;
+import uz.imaan.jobplatform.admin.dto.AdminDtoTwo;
 import uz.imaan.jobplatform.admin.service.AdminService;
 
 import java.util.ArrayList;
@@ -23,6 +23,7 @@ import java.util.concurrent.ConcurrentHashMap;
 
 @Service
 public class TelegramBotService extends TelegramLongPollingBot {
+
     // Хранение языка для каждого пользователя (chatId -> "RU" или "UZ")
     private final Map<Long, String> userLanguages = new ConcurrentHashMap<>();
 
@@ -31,19 +32,17 @@ public class TelegramBotService extends TelegramLongPollingBot {
     }
 
     private final Map<Long, String> userStates = new ConcurrentHashMap<>();
-    private final Map<Long, AdminDTO> pendingAdmins = new ConcurrentHashMap<>();
+    private final Map<Long, AdminDtoTwo> pendingAdmins = new ConcurrentHashMap<>();
 
     private String botUsername = "jobplatform_admin_bot";
+
     @Lazy
     @Autowired
-    private  AdminService adminService;
+    private AdminService adminService;
 
     public TelegramBotService(AdminService adminService) {
-//        super("8470148420:AAEcjcwI9sKspY94OFiB7V5gqmAjQvgVhPY");
         super("8757778609:AAEtyutp-PvYDx8DbtcIYSQmw7W4hU2GryI");
         this.botUsername = "employment_chirchik_bot";
-
-//        this.botUsername = "jobplatform_admin_bot";
         this.adminService = adminService;
     }
 
@@ -58,7 +57,6 @@ public class TelegramBotService extends TelegramLongPollingBot {
             // Обработка текстовых сообщений
             if (update.hasMessage() && update.getMessage().hasText()) {
                 Message message = update.getMessage();
-                long chatId = message.getChatId();
 
                 // ИГНОРИРУЕМ ПОВТОРНЫЕ ОБНОВЛЕНИЯ
                 if (lastUpdateId >= update.getUpdateId()) {
@@ -73,47 +71,54 @@ public class TelegramBotService extends TelegramLongPollingBot {
             // Обработка нажатий на кнопки
             if (update.hasCallbackQuery()) {
                 handleCallbackQuery(update.getCallbackQuery());
-                return;
             }
         } catch (Exception e) {
             e.printStackTrace();
         }
     }
 
-    // Добавь это поле в класс:
     private long lastUpdateId = 0;
 
     private void handleTextMessage(Message message) {
         String text = message.getText();
         long chatId = message.getChatId();
 
+        if (text.startsWith("/addadmin")) {
+            handleAddAdminCommand(text, chatId);
+            return;
+        }
+
         if (text == null) return;
 
         // ===== ОБРАБОТКА КОМАНД =====
         if (text.startsWith("/")) {
 
-            // 1. КОМАНДА /START - ТОЛЬКО ОДИН РАЗ!
+            // 1. КОМАНДА /START
             if ("/start".equals(text)) {
-                // Проверяем, есть ли уже приветствие
                 if (!userLanguages.containsKey(chatId)) {
-                    userLanguages.put(chatId, "RU"); // Язык по умолчанию
+                    userLanguages.put(chatId, "RU");
                 }
                 sendMessage(chatId, "Привет! Бот поиска почасовой работы JobPlatform запущен.");
-                return; // ВАЖНО: ВЫХОДИМ!
+                return;
             }
 
-            // 2. КОМАНДА /ADMIN - ТОЛЬКО ОДИН РАЗ!
+            // 2. КОМАНДА /ADMIN
             if ("/admin".equals(text)) {
                 if (chatId != 6326035618L) {
                     sendMessage(chatId, "У вас нет прав администратора.");
                     return;
                 }
                 sendAdminMenu(chatId);
-                return; // ВАЖНО: ВЫХОДИМ!
+                return;
+            }
+
+            // 3. КОМАНДЫ БЛОКИРОВКИ И РАЗБЛОКИРОВКИ
+            if (text.startsWith("/block") || text.startsWith("/unblock")) {
+                handleAdminCommand(text, chatId);
+                return;
             }
         }
 
-        // Если это не команда - просто игнорируем
         System.out.println("Игнорируем текст: " + text);
     }
 
@@ -121,50 +126,37 @@ public class TelegramBotService extends TelegramLongPollingBot {
         long chatId = callbackQuery.getMessage().getChatId();
         String data = callbackQuery.getData();
 
-        // Гасим часики на кнопке
         try {
             AnswerCallbackQuery answer = new AnswerCallbackQuery();
             answer.setCallbackQueryId(callbackQuery.getId());
             execute(answer);
         } catch (Exception ignored) {}
 
-        // 🌐 1. Нажали "Сменить язык"
         if ("change_language".equals(data)) {
             sendLanguageMenu(chatId);
-        }
-        // 🇷🇺 2. Выбрали Русский
-        else if ("lang_ru".equals(data)) {
+        } else if ("lang_ru".equals(data)) {
             userLanguages.put(chatId, "RU");
             sendMessage(chatId, "✅ Язык успешно изменён на **Русский**!");
-            sendAdminMenu(chatId); // Показываем меню на русском
-        }
-        // 🇺🇿 3. Выбрали Узбекский
-        else if ("lang_uz".equals(data)) {
+            sendAdminMenu(chatId);
+        } else if ("lang_uz".equals(data)) {
             userLanguages.put(chatId, "UZ");
             sendMessage(chatId, "✅ Til **O'zbekcha**ga muvaffaqiyatli o'zgartirildi!");
-            sendAdminMenu(chatId); // Показываем меню на узбекском
-        }
-        // 📊 4. Статистика
-        else if ("admin_stats".equals(data) || "stats".equals(data)) {
-            AdminDTO stats = adminService.getStats();
+            sendAdminMenu(chatId);
+        } else if ("admin_stats".equals(data) || "stats".equals(data)) {
+            AdminDtoTwo stats = adminService.getStats();
             String lang = getLanguage(chatId);
 
             String statsText = "UZ".equals(lang) ?
                     String.format("📊 *Platforma statistikasi:*\n\n👥 Adminlar: `%d`\n🏢 Ish beruvchilar: `%d`\n👤 Ishchilar: `%d`",
-                            stats.getTotalAdmins(), stats.getTotalEmployers(), stats.getTotalWorkers()) :
+                            stats.totalAdmins(), stats.totalEmployers(), stats.totalWorkers()) :
                     String.format("📊 *Статистика платформы:*\n\n👥 Админов: `%d`\n🏢 Работодателей: `%d`\n👤 Исполнителей: `%d`",
-                            stats.getTotalAdmins(), stats.getTotalEmployers(), stats.getTotalWorkers());
+                            stats.totalAdmins(), stats.totalEmployers(), stats.totalWorkers());
 
             sendMessage(chatId, statsText);
-        }
-        // 👷 5. Рабочие
-        else if ("admin_workers".equals(data) || "workers".equals(data)) {
+        } else if ("admin_workers".equals(data) || "workers".equals(data)) {
             sendMessage(chatId, adminService.getFormattedJobSeekersList());
-        }
-        // 🏢 6. Работодатели
-        else if ("admin_employers".equals(data) || "employers".equals(data)) {
+        } else if ("admin_employers".equals(data) || "employers".equals(data)) {
             sendMessage(chatId, adminService.getFormattedEmployersList());
-
         }
     }
 
@@ -184,9 +176,10 @@ public class TelegramBotService extends TelegramLongPollingBot {
                 Long targetUserId = Long.parseLong(parts[1]);
                 String reason = parts[2];
 
-                AdminDTO blockDTO = new AdminDTO();
-                blockDTO.setUserId(targetUserId);
-                blockDTO.setReason(reason);
+                AdminDtoTwo blockDTO = new AdminDtoTwo(
+                        null, null, null, null, null, null, null, null, null,
+                        0L, null, null, null, targetUserId, reason, null, null, null, 0L, 0L
+                );
 
                 blockUser(blockDTO);
 
@@ -243,30 +236,25 @@ public class TelegramBotService extends TelegramLongPollingBot {
         InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
         List<List<InlineKeyboardButton>> rows = new ArrayList<>();
 
-        // 1. Статистика
         InlineKeyboardButton statsBtn = new InlineKeyboardButton();
         statsBtn.setText("UZ".equals(lang) ? "📊 Platforma statistikasi" : "📊 Статистика платформы");
         statsBtn.setCallbackData("admin_stats");
 
-        // 2. Рабочие
         InlineKeyboardButton workersBtn = new InlineKeyboardButton();
         workersBtn.setText("UZ".equals(lang) ? "👷 Ishchilar" : "👷 Рабочие");
         workersBtn.setCallbackData("admin_workers");
 
-        // 3. Работодатели
         InlineKeyboardButton employersBtn = new InlineKeyboardButton();
         employersBtn.setText("UZ".equals(lang) ? "🏢 Ish beruvchilar" : "🏢 Работодатели");
         employersBtn.setCallbackData("admin_employers");
 
-        // 4. 🌐 КНОПКА СМЕНЫ ЯЗЫКА
         InlineKeyboardButton langBtn = new InlineKeyboardButton();
         langBtn.setText("🌐 Сменить язык / Tilni o'zgartirish");
         langBtn.setCallbackData("change_language");
 
-        // Сетка кнопок
         rows.add(List.of(statsBtn));
         rows.add(List.of(workersBtn, employersBtn));
-        rows.add(List.of(langBtn)); // 👈 Отдельный ряд для смены языка
+        rows.add(List.of(langBtn));
 
         markup.setKeyboard(rows);
         message.setReplyMarkup(markup);
@@ -279,8 +267,7 @@ public class TelegramBotService extends TelegramLongPollingBot {
         }
     }
 
-
-    public  void sendMessage(long chatId, String text) {
+    public void sendMessage(long chatId, String text) {
         SendMessage message = SendMessage.builder()
                 .chatId(chatId)
                 .text(text)
@@ -298,16 +285,15 @@ public class TelegramBotService extends TelegramLongPollingBot {
                 .replyMarkup(keyboard)
                 .build();
         try {
-            execute(message); // 👈 Замени editMessageText на message
+            execute(message);
         } catch (TelegramApiException e) {
             if (!e.getMessage().contains("message is not modified")) {
                 e.printStackTrace();
             }
         }
-
     }
 
-    private  void executeMessage(SendMessage message) {
+    private void executeMessage(SendMessage message) {
         try {
             execute(message);
         } catch (TelegramApiException e) {
@@ -315,16 +301,16 @@ public class TelegramBotService extends TelegramLongPollingBot {
         }
     }
 
-    public void blockUser(AdminDTO blockDTO) {
+    public void blockUser(AdminDtoTwo blockDTO) {
         adminService.blockUser(blockDTO);
 
         String blockMessage = String.format(
                 "❌ Ваш аккаунт заблокирован.\nПричина: %s",
-                blockDTO.getReason()
+                blockDTO.reason()
         );
 
         SendMessage sendMessage = SendMessage.builder()
-                .chatId(blockDTO.getUserId().toString())
+                .chatId(blockDTO.userId().toString())
                 .text(blockMessage)
                 .build();
 
@@ -372,4 +358,32 @@ public class TelegramBotService extends TelegramLongPollingBot {
         }
     }
 
+    private void handleAddAdminCommand(String text, long chatId) {
+        if (!adminService.isAdmin(chatId)) {
+            sendMessage(chatId, "❌ У вас нет прав для выполнения этой команды.");
+            return;
+        }
+
+        String[] parts = text.split("\\s+");
+        if (parts.length < 2) {
+            sendMessage(chatId, "⚠️ Формат команды: `/addadmin <Telegram_ID>`");
+            return;
+        }
+
+        try {
+            Long newAdminId = Long.parseLong(parts[1]);
+
+            AdminDtoTwo newAdminDto = new AdminDtoTwo(
+                    null, null, null, null, null, null, null, null, null,
+                    newAdminId, null, null, null, null, null, null, null, null, 0L, 0L
+            );
+            adminService.createAdmin(newAdminDto);
+
+            sendMessage(chatId, "✅ Пользователь с ID `" + newAdminId + "` успешно назначен администратором.");
+        } catch (NumberFormatException e) {
+            sendMessage(chatId, "❌ Некорректный Telegram ID. ID должен состоять только из цифр.");
+        } catch (Exception e) {
+            sendMessage(chatId, "❌ Ошибка при добавлении администратора: " + e.getMessage());
+        }
+    }
 }

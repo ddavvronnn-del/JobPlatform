@@ -1,35 +1,47 @@
 package uz.imaan.jobplatform.admin.mapper;
 
-
 import org.springframework.stereotype.Component;
+import uz.imaan.jobplatform.admin.dto.AdminDtoTwo;
 import uz.imaan.jobplatform.admin.entity.Admin;
-import uz.imaan.jobplatform.admin.dto.AdminDTO;
-
 
 @Component
 public class AdminMapper {
 
-    public AdminDTO toDTO(Admin entity) {
+    public AdminDtoTwo toDTO(Admin entity) {
         if (entity == null) return null;
 
-        AdminDTO dto = new AdminDTO();
-        dto.setId(entity.getId());
-        dto.setTelegramId(entity.getTelegramId());
-        dto.setUsername(entity.getUsername());
-        dto.setRole(entity.getRole());
-        dto.setIsActive(entity.getIsActive());
-        return dto;
+        return new AdminDtoTwo(
+                entity.getId(),
+                entity.getTelegramId(),
+                entity.getUsername(),
+                entity.getRole() != null ? entity.getRole().toString() : null,
+                entity.getIsActive(),
+                null, // numberOfUsers
+                null, // numberOfRequests
+                null, // totalWorkers
+                null, // totalEmployers
+                0L,   // completedShifts
+                null, // activeJobs
+                null, // completedJobs
+                null, // totalAdmins
+                null, // userId
+                null, // reason
+                null, // email
+                null, // password
+                null, // totalJobs
+                0L,   // totalVacancies
+                0L    // activeShifts
+        );
     }
 
-    public Admin toEntity(AdminDTO dto) {
+    public Admin toEntity(AdminDtoTwo dto) {
         if (dto == null) return null;
 
         Admin entity = new Admin();
-        entity.setId(dto.getId());
-        entity.setTelegramId(dto.getTelegramId());
-        entity.setUsername(dto.getUsername());
-        entity.setRole(dto.getRole());
-        entity.setIsActive(dto.getIsActive());
+        entity.setId(dto.id());
+        entity.setTelegramId(dto.telegramId());
+        entity.setUsername(dto.username());
+        entity.setIsActive(dto.isActive());
         return entity;
     }
 }
