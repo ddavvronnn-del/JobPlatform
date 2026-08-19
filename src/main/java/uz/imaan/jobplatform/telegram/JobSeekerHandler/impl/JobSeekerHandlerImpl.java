@@ -37,6 +37,7 @@ import java.util.concurrent.ConcurrentHashMap;
 public class JobSeekerHandlerImpl implements JobSeekerHandler {
 
     private final SubscriptionRepository subscriptionRepository;
+    private final Map<Long, JobSeekerState> previousStates = new ConcurrentHashMap<>();
 
     public enum JobSeekerState {
         NONE,
@@ -1303,11 +1304,30 @@ public class JobSeekerHandlerImpl implements JobSeekerHandler {
 
     @Override
     public String getProfileInfo(JobSeekerProfile profile, Optional<JobSeekerProfile> profileOpt) {
-        String jobTypeDisplay = "🔧 Обычный рабочий";
-        if ("Kasbim bo'yicha".equals(profile.getPreferredJobType())) {
+        // 1. Ish turini (jobTypeDisplay) tilga mos aniqlash
+        String jobTypeDisplay;
+        String preferred = profile.getPreferredJobType();
+
+        // Agar "PROFESSIONAL" bo‘lsa va kasb mavjud bo‘lsa – kasbni ko‘rsatish
+        if ("PROFESSIONAL".equals(preferred) && profile.getProfession() != null && !profile.getProfession().isEmpty()) {
             jobTypeDisplay = "👨‍💻 " + profile.getProfession();
+        } else {
+            // Oddiy ishchi – tilga mos matn
+            if (isRussian(profileOpt)) {
+                jobTypeDisplay = "🔧 Обычный рабочий";
+            } else if (isEnglish(profileOpt)) {
+                jobTypeDisplay = "🔧 Ordinary worker";
+            } else {
+                jobTypeDisplay = "🔧 Oddiy ishchi";
+            }
+            // Qo‘shimcha: agar preferred eski "Kasbim bo‘yicha" qiymatga ega bo‘lsa, profession ni ko‘rsatish
+            if (profile.getProfession() != null && !profile.getProfession().isEmpty() &&
+                    ("Kasbim bo'yicha".equals(preferred) || "По профессии".equals(preferred) || "By profession".equals(preferred))) {
+                jobTypeDisplay = "👨‍💻 " + profile.getProfession();
+            }
         }
 
+        // 2. Karta ma’lumoti (avvalgidek)
         String cardDisplay = "❌ Karta mavjud emas";
         try {
             if (profile.getBankCards() != null && !profile.getBankCards().isEmpty()) {
@@ -1326,6 +1346,7 @@ public class JobSeekerHandlerImpl implements JobSeekerHandler {
             cardDisplay = "❌ Karta ma'lumoti olinmadi";
         }
 
+        // 3. Tilga mos formatlash (keyingi qism o‘zgarishsiz)
         if (isRussian(profileOpt)) {
             return String.format(
                     "👤 **Информация профиля:**\n\n" +
@@ -1389,6 +1410,9 @@ public class JobSeekerHandlerImpl implements JobSeekerHandler {
         );
     }
 
+
+
+
     @Override
     public SendMessage showProfile(Long chatId, Optional<JobSeekerProfile> profileOpt) {
         if (profileOpt.isEmpty()) {
@@ -1399,7 +1423,13 @@ public class JobSeekerHandlerImpl implements JobSeekerHandler {
             );
             return createMessage(chatId, msg, getMainMenuKeyboard(profileOpt));
         }
-        return createMessage(chatId, getProfileInfo(profileOpt.get(), profileOpt), getProfileKeyboard(profileOpt));
+        // Faqat menyuni ko'rsatamiz, ma'lumotlarni emas
+        String menuText = getText(profileOpt, chatId,
+                "👤 **Profil menyusi**\n\nQuyidagi tugmalardan birini tanlang:",
+                "👤 **Profil menyusi**\n\nQuyidagi tugmalardan birini tanlang:",
+                "👤 **Profile menu**\n\nSelect one of the buttons below:"
+        );
+        return createMessage(chatId, menuText, getProfileKeyboard(profileOpt));
     }
 
     // ============================================
@@ -1659,10 +1689,17 @@ public class JobSeekerHandlerImpl implements JobSeekerHandler {
     // ============================================
     // SOZLAMALAR METODLARI
     // ============================================
+
     @Override
     public SendMessage handleSettingsMenu(Long chatId, String text, Optional<JobSeekerProfile> profileOpt) {
+        // Hozirgi holatni olish
+        JobSeekerState currentState = states.getOrDefault(chatId, JobSeekerState.MAIN_MENU);
+
+        // Tilni o'zgartirish
         if (text.equals("🌐 Til") || text.equals("🌐 Язык") || text.equals("🌐 Language") ||
                 text.contains("Til") || text.contains("Язык") || text.contains("Language")) {
+
+            previousStates.put(chatId, currentState);
             states.put(chatId, JobSeekerState.WAITING_FOR_LANGUAGE);
             String msg = getText(profileOpt, chatId,
                     "🌐 **Выберите язык / Choose language:**",
@@ -1672,6 +1709,7 @@ public class JobSeekerHandlerImpl implements JobSeekerHandler {
             return createMessage(chatId, msg, getLanguageKeyboard());
         }
 
+        // Maxfiylik
         if (text.equals("🔒 Maxfiylik") || text.equals("🔒 Конфиденциальность") || text.equals("🔒 Privacy") ||
                 text.contains("Maxfiylik") || text.contains("Конфиденциальность") || text.contains("Privacy")) {
             String msg = getText(profileOpt, chatId,
@@ -1682,6 +1720,7 @@ public class JobSeekerHandlerImpl implements JobSeekerHandler {
             return createMessage(chatId, msg, getSettingsKeyboard(profileOpt));
         }
 
+        // Bildirishnoma
         if (text.equals("🔔 Bildirishnoma") || text.equals("🔔 Уведомления") || text.equals("🔔 Notifications") ||
                 text.contains("Bildirishnoma") || text.contains("Уведомления") || text.contains("Notifications")) {
             String msg = getText(profileOpt, chatId,
@@ -1692,6 +1731,7 @@ public class JobSeekerHandlerImpl implements JobSeekerHandler {
             return createMessage(chatId, msg, getSettingsKeyboard(profileOpt));
         }
 
+        // Yordam
         if (text.equals("❓ Yordam") || text.equals("❓ Помощь") || text.equals("❓ Help") ||
                 text.contains("Yordam") || text.contains("Помощь") || text.contains("Help")) {
             String msg = getText(profileOpt, chatId,
@@ -1702,11 +1742,13 @@ public class JobSeekerHandlerImpl implements JobSeekerHandler {
             return createMessage(chatId, msg, getSettingsKeyboard(profileOpt));
         }
 
+        // Orqaga
         if (text.equals("⬅️ Orqaga") || text.equals("⬅️ Назад") || text.equals("⬅️ Back")) {
             states.put(chatId, JobSeekerState.MAIN_MENU);
             return createMessage(chatId, getMainMenuText(profileOpt), getMainMenuKeyboard(profileOpt));
         }
 
+        // Default – sozlamalar menyusi
         String msg = getText(profileOpt, chatId,
                 "⚙️ **Раздел настроек:**",
                 "⚙️ **Sozlamalar bo'limi:**",
@@ -1718,6 +1760,7 @@ public class JobSeekerHandlerImpl implements JobSeekerHandler {
     // ============================================
     // TIL TANLASH METODI
     // ============================================
+
     @Override
     public SendMessage handleLanguageSelection(Long chatId, String text, Optional<JobSeekerProfile> profileOpt) {
         String lang = null;
@@ -1728,7 +1771,6 @@ public class JobSeekerHandlerImpl implements JobSeekerHandler {
         } else if (text.equals("🇬🇧 English") || text.contains("English")) {
             lang = "en";
         } else {
-            states.put(chatId, JobSeekerState.WAITING_FOR_LANGUAGE);
             String msg = getText(profileOpt, chatId,
                     "❌ Пожалуйста, выберите язык:",
                     "❌ Iltimos, tilni tanlang:",
@@ -1737,14 +1779,18 @@ public class JobSeekerHandlerImpl implements JobSeekerHandler {
             return createMessage(chatId, msg, getLanguageKeyboard());
         }
 
+        // Tilni saqlash
         if (profileOpt.isPresent()) {
             profileOpt.get().setLanguage(lang);
             jobSeekerProfileRepository.save(profileOpt.get());
+            // Profilni qayta yuklash
+            profileOpt = jobSeekerProfileRepository.findByUserId(chatId);
         } else {
             data.putIfAbsent(chatId, new ConcurrentHashMap<>());
             data.get(chatId).put("tempLanguage", lang);
         }
 
+        // Ro‘yxatdan o‘tish jarayonida bo‘lsa
         if (data.get(chatId).containsKey("registration") && "true".equals(data.get(chatId).get("registration"))) {
             states.put(chatId, JobSeekerState.WAITING_FOR_NAME);
             data.get(chatId).remove("registration");
@@ -1759,12 +1805,32 @@ public class JobSeekerHandlerImpl implements JobSeekerHandler {
             return createMessage(chatId, msg, null);
         }
 
-        states.put(chatId, JobSeekerState.MAIN_MENU);
-        String msg;
-        if ("ru".equals(lang)) msg = "✅ Язык изменен на Русский!";
-        else if ("en".equals(lang)) msg = "✅ Language changed to English!";
-        else msg = "✅ Til O'zbek tiliga o'zgartirildi!";
-        return createMessage(chatId, msg, getMainMenuKeyboard(profileOpt));
+        // ✅ Oldingi holatga qaytish
+        JobSeekerState previous = previousStates.remove(chatId);
+        if (previous != null) {
+            states.put(chatId, previous);
+            // Agar oldingi holat SETTINGS_MENU bo‘lsa, sozlamalar menyusini ko‘rsatamiz
+            if (previous == JobSeekerState.SETTINGS_MENU) {
+                String msg = getText(profileOpt, chatId,
+                        "⚙️ **Раздел настроек:**",
+                        "⚙️ **Sozlamalar bo'limi:**",
+                        "⚙️ **Settings section:**"
+                );
+                return createMessage(chatId, msg, getSettingsKeyboard(profileOpt));
+            } else {
+                // Boshqa holatlarga mos keladigan keyboard
+                return createMessage(chatId, getMainMenuText(profileOpt), getMainMenuKeyboard(profileOpt));
+            }
+        } else {
+            // Agar oldingi holat bo‘lmasa, asosiy menyuga
+            states.put(chatId, JobSeekerState.MAIN_MENU);
+            String msg = getText(profileOpt, chatId,
+                    "✅ Язык изменен на Русский!",
+                    "✅ Til O'zbek tiliga o'zgartirildi!",
+                    "✅ Language changed to English!"
+            );
+            return createMessage(chatId, msg, getMainMenuKeyboard(profileOpt));
+        }
     }
 
     // ============================================
