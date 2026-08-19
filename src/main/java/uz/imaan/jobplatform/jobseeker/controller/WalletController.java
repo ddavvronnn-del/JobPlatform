@@ -45,21 +45,6 @@ public class WalletController {
         return ResponseEntity.ok(walletService.getMyCards(userId));
     }
 
-    // ============================================
-    // 3. KARTA MUDDATINI TEKSHIRISH (YANGI QO'SHILDI)
-    // ============================================
-    @GetMapping("/cards/{cardNumber}/check-expiry")
-    public ResponseEntity<Boolean> checkCardExpiry(
-            @PathVariable String cardNumber) {
-        log.info("GET /api/v1/job-seeker/wallet/cards/{}/check-expiry", cardNumber);
-
-        // Kartani topish
-        BankCard card = bankCardRepository.findByCardNumber(cardNumber)
-                .orElseThrow(() -> new RuntimeException("Karta topilmadi: " + cardNumber));
-
-        boolean isExpired = walletService.isCardExpired(card.getExpireDate());
-        return ResponseEntity.ok(isExpired);
-    }
 
     // ============================================
     // 4. TRANZAKSIYALAR TARIXI

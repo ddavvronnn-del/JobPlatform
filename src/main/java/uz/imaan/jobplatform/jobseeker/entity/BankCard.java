@@ -31,8 +31,6 @@ public class BankCard {
     private String cardNumber;
 
 
-    @Column(name = "expire_date", nullable = false)
-    private String expireDate; // MM/YY
 
 
     @NotBlank(message = "Karta egasi ismi kiritilishi shart ")

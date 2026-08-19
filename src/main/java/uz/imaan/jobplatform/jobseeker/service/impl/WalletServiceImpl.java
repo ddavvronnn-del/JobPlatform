@@ -165,12 +165,6 @@ public class WalletServiceImpl implements WalletService {
             throw new IllegalStateException("Pul yechish uchun avval karta qo'shing!");
         }
 
-        // Kartalar muddati o'tmaganligini tekshirish
-        for (BankCard card : cards) {
-            if (isCardExpired(card.getExpireDate())) {
-                throw new IllegalStateException("Karta muddati o'tgan! " + card.getCardNumber());
-            }
-        }
 
         // Balansni tekshirish
         if (profile.getWalletBalance() == null || profile.getWalletBalance().compareTo(amount) < 0) {
