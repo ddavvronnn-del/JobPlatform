@@ -4,6 +4,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Component;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
+import org.telegram.telegrambots.meta.api.methods.updatingmessages.EditMessageText;
 import org.telegram.telegrambots.meta.api.objects.CallbackQuery;
 import org.telegram.telegrambots.meta.api.objects.Message;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
@@ -21,6 +22,7 @@ import uz.imaan.jobplatform.jobseeker.entity.Subscription;
 import uz.imaan.jobplatform.jobseeker.repository.SubscriptionRepository;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -38,7 +40,6 @@ public class EmployerHandler {
     private final Map<Long, EmployerState> states = new ConcurrentHashMap<>();
     private final Map<Long, Map<String, String>> draftData = new ConcurrentHashMap<>();
 
-    // Circular dependency (doiraviy bog'liqlik) xatoligini oldini olish uchun @Lazy qo'shildi
     public EmployerHandler(
             EmployerRepository employerRepository,
             JobVacancyRepository jobVacancyRepository,
@@ -60,9 +61,7 @@ public class EmployerHandler {
         Optional<EmployerEntity> profileOpt = employerRepository.findByEmployerChatId(chatId);
         String lang = profileOpt.map(EmployerEntity::getLanguage).orElse("uz");
 
-        // ============================================
-        // 0. AGAR PROFIL YO'Q YOKI ESKICHA "EMPLOYER" BO'LSA
-        // ============================================
+        // 0. Ro'yxatdan o'tish zarurati
         boolean isRegistrationNeeded = profileOpt.isEmpty() ||
                 profileOpt.get().getFullName() == null ||
                 profileOpt.get().getFullName().isBlank() ||
@@ -75,9 +74,7 @@ public class EmployerHandler {
             return handleRegistration(chatId, text, message, lang, profileOpt);
         }
 
-        // ============================================
-        // 1. GLOBAL BUYRUQLAR (INTERRUPT & ASOSIY MENYU)
-        // ============================================
+        // 1. Global buyruqlar
         if (isGlobalButton(text)) {
             draftData.get(chatId).clear();
             states.put(chatId, EmployerState.MAIN_MENU);
@@ -114,9 +111,7 @@ public class EmployerHandler {
 
         EmployerState state = states.getOrDefault(chatId, EmployerState.MAIN_MENU);
 
-        // ============================================
-        // 2. SOZLAMALAR VA TIL SELEKSIYASI
-        // ============================================
+        // 2. Sozlamalar va til seleksiyasi
         if (state == EmployerState.SETTINGS_MENU) {
             if (text.equals("🌐 Til") || text.equals("🌐 Язык")) {
                 states.put(chatId, EmployerState.WAITING_FOR_LANGUAGE);
@@ -140,10 +135,7 @@ public class EmployerHandler {
             return createMessage(chatId, getText(lang, "⚙️ Sozlamalar", "⚙️ Настройки"), getSettingsKeyboard(lang));
         }
 
-        // ============================================
-        // 3. VAKANSIYA YARATISH BOSQICHLARI
-        // ============================================
-
+        // 3. Vakansiya yaratish bosqichlari
         if (state == EmployerState.WAITING_FOR_TITLE) {
             if (!isValidTitle(text)) {
                 return createMessage(chatId, getText(lang,
@@ -159,7 +151,6 @@ public class EmployerHandler {
             if (!isValidCategory(text)) {
                 return createMessage(chatId, getText(lang, "⚠️ **Kategoriya nomini tugma orqali tanlang:**", "⚠️ **Выберите категорию с помощью кнопок:**"), getCategoryKeyboard(lang));
             }
-
             draftData.get(chatId).put("category", text);
             states.put(chatId, EmployerState.WAITING_FOR_JOB_TYPE);
             return createMessage(chatId, getText(lang, "⏰ **Ish turini tanlang:**", "⏰ **Выберите тип работы:**"), getTypeKeyboard(lang));
@@ -246,7 +237,7 @@ public class EmployerHandler {
 
             jobVacancyRepository.save(vacancy);
 
-            // ====== OBUNACHILARGA XABAR YO'NATISH ======
+            // ====== OBUNACHILARGA XABAR YO'NATISH (TUGMA BILAN) ======
             try {
                 String postedCategory = vacancy.getCategory();
                 List<Subscription> subscribers = subscriptionRepository.findByCategory(postedCategory);
@@ -268,8 +259,18 @@ public class EmployerHandler {
                             vacancy.getPhoneNumber() != null ? vacancy.getPhoneNumber() : "Ko'rsatilmagan"
                     );
 
+                    InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
+                    List<List<InlineKeyboardButton>> rows = new ArrayList<>();
+                    List<InlineKeyboardButton> row = new ArrayList<>();
+                    InlineKeyboardButton applyBtn = new InlineKeyboardButton("📩 Ariza topshirish");
+                    applyBtn.setCallbackData("apply_" + vacancy.getId());
+                    row.add(applyBtn);
+                    rows.add(row);
+                    markup.setKeyboard(rows);
+
                     SendMessage notificationMsg = new SendMessage(seekerUserId.toString(), notificationText);
                     notificationMsg.setParseMode("Markdown");
+                    notificationMsg.setReplyMarkup(markup);
 
                     try {
                         telegram.execute(notificationMsg);
@@ -296,13 +297,12 @@ public class EmployerHandler {
         return createMessage(chatId, getText(lang, "📢 **Ish beruvchi menyusi:**", "📢 **Меню работодателя:**"), getMainMenuKeyboard(lang));
     }
 
-    // ============================================
-    // CALLBACK QUERY HANDLER (INLINE BUTTONS)
-    // ============================================
+    // Callback Query Handler (Inline Buttons)
     public SendMessage handleCallback(CallbackQuery callbackQuery) {
         if (callbackQuery == null || callbackQuery.getMessage() == null) return null;
 
         Long chatId = callbackQuery.getMessage().getChatId();
+        Integer messageId = callbackQuery.getMessage().getMessageId();
         String data = callbackQuery.getData();
         draftData.putIfAbsent(chatId, new ConcurrentHashMap<>());
 
@@ -311,6 +311,7 @@ public class EmployerHandler {
 
         EmployerState state = states.getOrDefault(chatId, EmployerState.MAIN_MENU);
 
+        // 1. Kategoriya tanlash callbacklari
         if (state == EmployerState.WAITING_FOR_CATEGORY && data != null && data.startsWith("emp_cat_")) {
             String catValue = data.substring("emp_cat_".length());
 
@@ -329,12 +330,68 @@ public class EmployerHandler {
             return createMessage(chatId, getText(lang, "⏰ **Ish turini tanlang:**", "⏰ **Выберите тип работы:**"), getTypeKeyboard(lang));
         }
 
+        // 2. Ariza qabul qilish yoki rad etish callbacklari
+        if (data != null && (data.startsWith("accept_app_") || data.startsWith("reject_app_"))) {
+            boolean isAccept = data.startsWith("accept_app_");
+            String[] parts = data.split("_");
+
+            String originalText = "";
+            if (callbackQuery.getMessage() instanceof org.telegram.telegrambots.meta.api.objects.Message msg) {
+                originalText = msg.hasText() ? msg.getText() : "";
+            }
+
+            String promptUz = "Quyidagilardan birini tanlang:";
+            String promptRu = "Выберите действие ниже:";
+
+            String statusMessage = isAccept ?
+                    (lang.equals("ru") ? "✅ **Статус: Заявка принята**" : "✅ **Holat: Ariza qabul qilindi**") :
+                    (lang.equals("ru") ? "❌ **Статус: Заявка отклонена**" : "❌ **Holat: Ariza rad etildi**");
+
+            String updatedText;
+            if (originalText.contains(promptUz)) {
+                updatedText = originalText.replace(promptUz, statusMessage);
+            } else if (originalText.contains(promptRu)) {
+                updatedText = originalText.replace(promptRu, statusMessage);
+            } else {
+                updatedText = originalText + "\n\n" + statusMessage;
+            }
+
+            // Xabarni tahrirlash
+            EditMessageText edit = new EditMessageText();
+            edit.setChatId(chatId.toString());
+            edit.setMessageId(messageId);
+            edit.setText(updatedText);
+            edit.setParseMode("Markdown");
+            edit.setReplyMarkup(null);
+
+            try {
+                telegram.execute(edit);
+            } catch (Exception e) {
+                log.error("❌ Xabarni tahrirlashda xatolik", e);
+            }
+
+            // Nomzodga xabar jo'natish
+            if (parts.length >= 4) {
+                try {
+                    Long employeeChatId = Long.parseLong(parts[3]);
+                    String seekerMsgText = isAccept ?
+                            (lang.equals("ru") ? "🎉 Ваша заявка на вакансию была принята работодателем!" : "🎉 Tabriklaymiz! Sizning arizangiz ish beruvchi tomonidan qabul qilindi!") :
+                            (lang.equals("ru") ? "⚠️ К сожалению, ваша заявка была отклонена работодателем." : "⚠️ Afsuski, arizangiz ish beruvchi tomonidan rad etildi.");
+
+                    SendMessage seekerMsg = new SendMessage(employeeChatId.toString(), seekerMsgText);
+                    telegram.execute(seekerMsg);
+                } catch (Exception e) {
+                    log.error("❌ Nomzodga xabar yuborishda xatolik", e);
+                }
+            }
+
+            return null;
+        }
+
         return null;
     }
 
-    // ============================================
-    // RO'YXATDAN O'TISH
-    // ============================================
+    // Ro'yxatdan o'tish
     private SendMessage handleRegistration(Long chatId, String text, Message message, String lang, Optional<EmployerEntity> profileOpt) {
         EmployerState regState = states.getOrDefault(chatId, EmployerState.WAITING_FOR_REG_FULL_NAME);
 
@@ -396,9 +453,7 @@ public class EmployerHandler {
         return createMessage(chatId, getText(lang, "👤 Ism va familiyangizni kiriting:", "👤 Введите ваше имя и фамилию:"));
     }
 
-    // ============================================
-    // BILDIRISHNOMA YUBORISH
-    // ============================================
+    // Bildirishnoma yuborish
     public SendMessage buildApplicationNotification(
             Long employerChatId,
             Long applicationId,
@@ -415,7 +470,7 @@ public class EmployerHandler {
                         vacancyTitle, candidateName, candidatePhone);
 
         InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
-        List<List<InlineKeyboardButton>> rows = new java.util.ArrayList<>();
+        List<List<InlineKeyboardButton>> rows = new ArrayList<>();
 
         InlineKeyboardButton acceptBtn = new InlineKeyboardButton();
         acceptBtn.setText(lang.equals("ru") ? "✅ Принять" : "✅ Qabul qilish");
@@ -435,9 +490,7 @@ public class EmployerHandler {
         return message;
     }
 
-    // ============================================
-    // PROFIL VA VAKANSIYALARNI KO'RSATISH
-    // ============================================
+    // Profilni ko'rsatish
     private SendMessage showProfile(Long chatId, Optional<EmployerEntity> profileOpt, String lang) {
         if (profileOpt.isEmpty() || profileOpt.get().getFullName() == null || profileOpt.get().getFullName().toLowerCase().contains("employer")) {
             states.put(chatId, EmployerState.WAITING_FOR_REG_FULL_NAME);
@@ -456,6 +509,7 @@ public class EmployerHandler {
         return createMessage(chatId, msg, getMainMenuKeyboard(lang));
     }
 
+    // Mening vakansiyalarimni ko'rsatish
     private SendMessage showMyVacancies(Long chatId, String lang) {
         List<JobVacancy> myJobs = jobVacancyRepository.findAllByEmployerChatId(chatId);
         if (myJobs.isEmpty()) {
@@ -473,9 +527,7 @@ public class EmployerHandler {
         return createMessage(chatId, sb.toString(), getMainMenuKeyboard(lang));
     }
 
-    // ============================================
-    // VALIDATION & HELPERS
-    // ============================================
+    // Validation & Helpers
     private boolean isValidTitle(String text) {
         return text != null && text.length() >= 3 && text.length() <= 100;
     }
@@ -555,6 +607,7 @@ public class EmployerHandler {
         return message;
     }
 
+    // Keyboards
     private ReplyKeyboardMarkup getMainMenuKeyboard(String lang) {
         return createReplyKeyboard(List.of(
                 List.of(getText(lang, "📢 Vakansiya yaratish", "📢 Создать вакансию")),
@@ -602,7 +655,7 @@ public class EmployerHandler {
 
     private InlineKeyboardMarkup getCategoryKeyboard(String lang) {
         InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
-        List<List<InlineKeyboardButton>> rows = new java.util.ArrayList<>();
+        List<List<InlineKeyboardButton>> rows = new ArrayList<>();
 
         List<String> categories = List.of(
                 "💻 IT & Dasturlash", "🎨 Dizayn",
