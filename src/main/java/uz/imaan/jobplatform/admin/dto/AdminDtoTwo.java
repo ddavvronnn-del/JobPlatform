@@ -1,7 +1,10 @@
 package uz.imaan.jobplatform.admin.dto;
 
+import lombok.Builder;
+
+@Builder
 public record AdminDtoTwo(
-        Long id,Long telegramId,
+        Long id, Long telegramId,
         String username,
         String role,
         Boolean isActive,
@@ -16,10 +19,11 @@ public record AdminDtoTwo(
         Long userId,
         String reason,
         String Email,
-        String Password,
+        Long Password,
         Long totalJobs,
         long totalVacancies,
         long activeShifts
 
 ) {
+
 }

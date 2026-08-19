@@ -84,29 +84,22 @@ public class AdminService {
         adminRepository.deleteById(id);
     }
 
+
     public AdminDtoTwo getStats() {
-        return new AdminDtoTwo(
-                null, // id
-                null, // telegramId
-                null, // username
-                null, // role
-                null, // isActive
-                null, // numberOfUsers
-                null, // numberOfRequests
-                0L,   // totalWorkers (employerRepository/jobSeekerProfileRepository.count())
-                0L,   // totalEmployers
-                0L,   // completedShifts
-                0L,   // activeJobs
-                0L,   // completedJobs
-                adminRepository.count(), // totalAdmins
-                null, // userId
-                null, // reason
-                null, // email
-                null, // password
-                0L,   // totalJobs
-                0L,   // totalVacancies
-                0L    // activeShifts
-        );
+        long admins = adminRepository.count();
+        long workers = jobSeekerProfileRepository.findAll().size();
+        long employers = employerRepository.findAll().size();
+
+        // 🔍 ПРОВЕРКА В КОНСОЛИ IDE
+        System.out.println(">>> DEBUG ADM: " + admins);
+        System.out.println(">>> DEBUG WRK: " + workers);
+        System.out.println(">>> DEBUG EMP: " + employers);
+
+        return AdminDtoTwo.builder()
+                .totalAdmins(admins)
+                .totalWorkers(workers)
+                .totalEmployers(employers)
+                .build();
     }
 
     @Transactional
@@ -227,4 +220,6 @@ public class AdminService {
         }
         return sb.toString();
     }
+
+
 }

@@ -145,13 +145,15 @@ public class TelegramBotService extends TelegramLongPollingBot {
             sendAdminMenu(chatId);
         } else if ("admin_stats".equals(data) || "stats".equals(data)) {
             AdminDtoTwo stats = adminService.getStats();
-            String lang = getLanguage(chatId);
 
-            String statsText = "UZ".equals(lang) ?
-                    String.format("📊 *Platforma statistikasi:*\n\n👥 Adminlar: `%d`\n🏢 Ish beruvchilar: `%d`\n👤 Ishchilar: `%d`",
-                            stats.totalAdmins(), stats.totalEmployers(), stats.totalWorkers()) :
-                    String.format("📊 *Статистика платформы:*\n\n👥 Админов: `%d`\n🏢 Работодателей: `%d`\n👤 Исполнителей: `%d`",
-                            stats.totalAdmins(), stats.totalEmployers(), stats.totalWorkers());
+            long admins = stats.totalAdmins() != null ? stats.totalAdmins() : 0;
+            long employers = stats.totalEmployers() != null ? stats.totalEmployers() : 0;
+            long workers = stats.totalWorkers() != null ? stats.totalWorkers() : 0;
+
+            String statsText = String.format(
+                    "📊 *Статистика платформы:*\n\n👥 Админов: `%d`\n🏢 Работодателей: `%d`\n👤 Исполнителей: `%d`",
+                    admins, employers, workers
+            );
 
             sendMessage(chatId, statsText);
         } else if ("admin_workers".equals(data) || "workers".equals(data)) {
@@ -227,6 +229,15 @@ public class TelegramBotService extends TelegramLongPollingBot {
 
     public void sendAdminMenu(long chatId) {
         String lang = getLanguage(chatId);
+
+        AdminDtoTwo stats = adminService.getStats();
+
+        String statsText = String.format(
+                "📊 *Статистика платформы:*\n\n👥 Админов: `%d`\n🏢 Работодателей: `%d`\n👤 Исполнителей: `%d`",
+                stats.totalAdmins(),
+                stats.totalEmployers(), // ❌ Поле содержит 0 или null из-за неверного маппинга
+                stats.totalWorkers()    // ❌ Поле содержит 0 или null из-за неверного маппинга
+        );
 
         SendMessage message = new SendMessage();
         message.setChatId(String.valueOf(chatId));
@@ -387,4 +398,7 @@ public class TelegramBotService extends TelegramLongPollingBot {
             sendMessage(chatId, "❌ Ошибка при добавлении администратора: " + e.getMessage());
         }
     }
+
+
+
 }
