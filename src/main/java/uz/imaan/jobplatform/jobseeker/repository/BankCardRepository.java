@@ -10,6 +10,8 @@ public interface BankCardRepository extends JpaRepository<BankCard, Long> {
 
     List<BankCard> findByJobSeekerId(Long jobSeekerId);
 
+    Optional<BankCard> findFirstByJobSeekerId(Long jobSeekerId);
+
     Optional<BankCard> findByCardNumber(String cardNumber);
 
     boolean existsByCardNumber(String cardNumber);

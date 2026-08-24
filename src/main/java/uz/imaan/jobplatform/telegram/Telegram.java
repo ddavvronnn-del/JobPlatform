@@ -91,6 +91,7 @@ public class Telegram extends TelegramLongPollingBot {
                     return;
                 }
 
+
                 if (callbackData.startsWith("accept_app_") || callbackData.startsWith("reject_app_")) {
                     boolean isAccept = callbackData.startsWith("accept_app_");
                     String prefix = isAccept ? "accept_app_" : "reject_app_";

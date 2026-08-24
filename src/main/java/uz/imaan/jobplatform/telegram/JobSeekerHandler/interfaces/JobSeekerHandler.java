@@ -1,6 +1,7 @@
 package uz.imaan.jobplatform.telegram.JobSeekerHandler.interfaces;
 
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
+import org.telegram.telegrambots.meta.api.objects.CallbackQuery;
 import org.telegram.telegrambots.meta.api.objects.Message;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.ReplyKeyboardMarkup;
@@ -104,4 +105,16 @@ public interface JobSeekerHandler {
     // 9. KATEGORIYA BO'YICHA QIDIRISH
     // ============================================
     void handleCategorySearch(Long chatId, String categoryKey, Optional<JobSeekerProfile> profileOpt);
+
+    // ============================================
+    // 10. PORTFOLIO METODLARI
+    // ============================================
+    SendMessage showPortfolio(Long chatId, Optional<JobSeekerProfile> profileOpt);
+
+    SendMessage handlePortfolioInput(Long chatId, String text, Optional<JobSeekerProfile> profileOpt);
+
+    String getProfileInfo(Long chatId, Optional<JobSeekerProfile> profileOpt);
+
+    SendMessage handleCallback(CallbackQuery callbackQuery);
+
 }
