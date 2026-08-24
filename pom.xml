@@ -19,6 +19,8 @@
     <properties>
         <java.version>17</java.version>
         <lombok.version>1.18.36</lombok.version>
+        <!-- Spring Boot 3.4.2 uchun mos keladigan Spring Cloud versiyasi -->
+        <spring-cloud.version>2024.0.3</spring-cloud.version>
     </properties>
 
     <dependencies>
@@ -75,6 +77,12 @@
             <version>6.9.7.1</version>
         </dependency>
 
+        <!-- Spring Cloud OpenFeign -->
+        <dependency>
+            <groupId>org.springframework.cloud</groupId>
+            <artifactId>spring-cloud-starter-openfeign</artifactId>
+        </dependency>
+
         <!-- Test -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
@@ -83,9 +91,21 @@
         </dependency>
     </dependencies>
 
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>org.springframework.cloud</groupId>
+                <artifactId>spring-cloud-dependencies</artifactId>
+                <version>${spring-cloud.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+
     <build>
         <plugins>
-            <!-- Lombok va Java 21 compiler mosligi uchun -->
+            <!-- Lombok va Java compiler mosligi uchun -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>

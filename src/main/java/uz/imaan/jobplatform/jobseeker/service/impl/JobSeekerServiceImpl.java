@@ -1,6 +1,7 @@
 package uz.imaan.jobplatform.jobseeker.service.impl;
 
 
+import jakarta.annotation.PostConstruct;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -8,6 +9,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import uz.imaan.jobplatform.feign.TestFeignClient;
 import uz.imaan.jobplatform.jobseeker.dto.*;
 import uz.imaan.jobplatform.jobseeker.entity.JobApplication;
 import uz.imaan.jobplatform.jobseeker.entity.JobSeekerProfile;
@@ -33,10 +35,19 @@ public class JobSeekerServiceImpl implements JobSeekerService {
     private final JobApplicationRepository applicationRepository;
     private final ResumeRepository resumeRepository;
     private final JobSeekerMapper mapper;
+    private final TestFeignClient testFeignClient;
 
     // ============================================
     // PROFIL SERVICES
     // ============================================
+
+
+    @PostConstruct
+    void test() {
+        System.err.println(testFeignClient.getData());
+    }
+
+
 
     @Override
     @Transactional(readOnly = true)

@@ -21,6 +21,10 @@ import uz.imaan.jobplatform.employer.state.EmployerState;
 import uz.imaan.jobplatform.jobseeker.entity.Subscription;
 import uz.imaan.jobplatform.jobseeker.repository.SubscriptionRepository;
 
+// Siz taqdim etgan JobSeeker entity va repository'lari
+import uz.imaan.jobplatform.jobseeker.entity.JobSeekerProfile;
+import uz.imaan.jobplatform.jobseeker.repository.JobSeekerProfileRepository;
+
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -35,6 +39,7 @@ public class EmployerHandler {
     private final EmployerRepository employerRepository;
     private final JobVacancyRepository jobVacancyRepository;
     private final SubscriptionRepository subscriptionRepository;
+    private final JobSeekerProfileRepository jobSeekerProfileRepository;
     private final Telegram telegram;
 
     private final Map<Long, EmployerState> states = new ConcurrentHashMap<>();
@@ -44,10 +49,12 @@ public class EmployerHandler {
             EmployerRepository employerRepository,
             JobVacancyRepository jobVacancyRepository,
             SubscriptionRepository subscriptionRepository,
+            JobSeekerProfileRepository jobSeekerProfileRepository,
             @Lazy Telegram telegram) {
         this.employerRepository = employerRepository;
         this.jobVacancyRepository = jobVacancyRepository;
         this.subscriptionRepository = subscriptionRepository;
+        this.jobSeekerProfileRepository = jobSeekerProfileRepository;
         this.telegram = telegram;
     }
 
@@ -356,7 +363,7 @@ public class EmployerHandler {
                 updatedText = originalText + "\n\n" + statusMessage;
             }
 
-            // Xabarni tahrirlash
+            // Xabarni tahrirlash (Tugmalarni olib tashlash)
             EditMessageText edit = new EditMessageText();
             edit.setChatId(chatId.toString());
             edit.setMessageId(messageId);
@@ -370,18 +377,62 @@ public class EmployerHandler {
                 log.error("❌ Xabarni tahrirlashda xatolik", e);
             }
 
-            // Nomzodga xabar jo'natish
+            // ====== TOMONLARGA TO'LIQ MA'LUMOT JO'NATISH (JobSeekerProfile orqali) ======
             if (parts.length >= 4) {
                 try {
                     Long employeeChatId = Long.parseLong(parts[3]);
-                    String seekerMsgText = isAccept ?
-                            (lang.equals("ru") ? "🎉 Ваша заявка на вакансию была принята работодателем!" : "🎉 Tabriklaymiz! Sizning arizangiz ish beruvchi tomonidan qabul qilindi!") :
-                            (lang.equals("ru") ? "⚠️ К сожалению, ваша заявка была отклонена работодателем." : "⚠️ Afsuski, arizangiz ish beruvchi tomonidan rad etildi.");
 
-                    SendMessage seekerMsg = new SendMessage(employeeChatId.toString(), seekerMsgText);
-                    telegram.execute(seekerMsg);
+                    if (isAccept) {
+                        Optional<EmployerEntity> employerOpt = employerRepository.findByEmployerChatId(chatId);
+                        // JobSeekerProfileRepository dan userId bo'yicha qidirish
+                        Optional<JobSeekerProfile> seekerOpt = jobSeekerProfileRepository.findByUserId(employeeChatId);
+
+                        if (employerOpt.isPresent() && seekerOpt.isPresent()) {
+                            EmployerEntity employer = employerOpt.get();
+                            JobSeekerProfile seeker = seekerOpt.get();
+
+                            // 1. Ish beruvchiga nomzod ma'lumotlari (JobSeekerProfile fieldlari ishlatildi)
+                            String seekerInfo = lang.equals("ru") ?
+                                    String.format("👤 **Анкета кандидата:**\n\n👤 **ФИО:** %s\n📞 **Телефон:** %s\n💼 **Профессия:** %s\n📝 **Опыт работы:** %s",
+                                            seeker.getFullName(), seeker.getPhoneNumber(),
+                                            (seeker.getProfession() != null ? seeker.getProfession() : "Не указано"),
+                                            (seeker.getExperience() != null ? seeker.getExperience() : "Не указано")) :
+                                    String.format("👤 **Nomzod anketasi:**\n\n👤 **F.I.O:** %s\n📞 **Telefon:** %s\n💼 **Kasbi:** %s\n📝 **Tajribasi:** %s",
+                                            seeker.getFullName(), seeker.getPhoneNumber(),
+                                            (seeker.getProfession() != null ? seeker.getProfession() : "Ko'rsatilmagan"),
+                                            (seeker.getExperience() != null ? seeker.getExperience() : "Ko'rsatilmagan"));
+
+                            SendMessage employerInfoMsg = new SendMessage(chatId.toString(), seekerInfo);
+                            employerInfoMsg.setParseMode("Markdown");
+                            telegram.execute(employerInfoMsg);
+
+                            // 2. Nomzodga ish beruvchi ma'lumotlari
+                            String seekerLang = (seeker.getLanguage() != null) ? seeker.getLanguage() : "uz";
+                            String employerInfo = seekerLang.equals("ru") ?
+                                    String.format("🎉 **Ваша заявка принята!**\nСвяжитесь с работодателем.\n\n🏢 **Данные работодателя:**\n👤 **ФИО:** %s\n🪪 **Данные:** %s\n📞 **Телефон:** %s",
+                                            employer.getFullName(),
+                                            (employer.getCompanyName() != null ? employer.getCompanyName() : "Не указано"),
+                                            employer.getPhoneNumber()) :
+                                    String.format("🎉 **Arizangiz qabul qilindi!**\nIsh beruvchi bilan bog'laning.\n\n🏢 **Ish beruvchi ma'lumotlari:**\n👤 **F.I.O:** %s\n🪪 **Ma'lumotlar:** %s\n📞 **Telefon:** %s",
+                                            employer.getFullName(),
+                                            (employer.getCompanyName() != null ? employer.getCompanyName() : "Ko'rsatilmagan"),
+                                            employer.getPhoneNumber());
+
+                            SendMessage seekerInfoMsg = new SendMessage(employeeChatId.toString(), employerInfo);
+                            seekerInfoMsg.setParseMode("Markdown");
+                            telegram.execute(seekerInfoMsg);
+                        } else {
+                            String seekerMsgText = (lang.equals("ru") ? "🎉 Ваша заявка на вакансию была принята работодателем!" : "🎉 Tabriklaymiz! Sizning arizangiz ish beruvchi tomonidan qabul qilindi!");
+                            SendMessage seekerMsg = new SendMessage(employeeChatId.toString(), seekerMsgText);
+                            telegram.execute(seekerMsg);
+                        }
+                    } else {
+                        String seekerMsgText = (lang.equals("ru") ? "⚠️ К сожалению, ваша заявка была отклонена работодателем." : "⚠️ Afsuski, arizangiz ish beruvchi tomonidan rad etildi.");
+                        SendMessage seekerMsg = new SendMessage(employeeChatId.toString(), seekerMsgText);
+                        telegram.execute(seekerMsg);
+                    }
                 } catch (Exception e) {
-                    log.error("❌ Nomzodga xabar yuborishda xatolik", e);
+                    log.error("❌ Nomzod/Ish beruvchiga xabar yuborishda xatolik", e);
                 }
             }
 
