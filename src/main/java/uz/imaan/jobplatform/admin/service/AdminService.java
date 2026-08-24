@@ -221,5 +221,25 @@ public class AdminService {
         return sb.toString();
     }
 
+    public AdminDtoTwo getDetailedStats() {
+        long totalAdmins = (adminChatIds != null ? adminChatIds.size() : 0) + adminRepository.count();
+
+        // Считаем рабочих и работодателей
+        long totalWorkers = jobSeekerProfileRepository.findAll().size();
+        long totalEmployers = employerRepository.findAll().size();
+
+        // Считаем дополнительные параметры (если есть нужные репозитории)
+        long activeJobsCount = 0L; // Например: jobRepository.countByStatus("ACTIVE");
+        long completedShiftsCount = 0L; // Например: shiftRepository.countByStatus("COMPLETED");
+
+        return AdminDtoTwo.builder()
+                .totalAdmins(totalAdmins)
+                .totalEmployers(totalEmployers)
+                .totalWorkers(totalWorkers)
+                .activeJobs(activeJobsCount)
+                .completedShifts(completedShiftsCount)
+                .build();
+    }
+
 
 }

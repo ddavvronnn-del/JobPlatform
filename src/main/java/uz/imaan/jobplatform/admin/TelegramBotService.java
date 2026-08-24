@@ -160,7 +160,11 @@ public class TelegramBotService extends TelegramLongPollingBot {
             sendMessage(chatId, adminService.getFormattedJobSeekersList());
         } else if ("admin_employers".equals(data) || "employers".equals(data)) {
             sendMessage(chatId, adminService.getFormattedEmployersList());
-        }
+        } else if ("admin_refresh".equals(data)) {
+        sendAdminMenu(chatId);
+    }
+
+
     }
 
     public void handleAdminCommand(String text, Long adminChatId) {
@@ -228,53 +232,75 @@ public class TelegramBotService extends TelegramLongPollingBot {
     }
 
     public void sendAdminMenu(long chatId) {
+        AdminDtoTwo stats = adminService.getDetailedStats();
+
+        long admins = stats.totalAdmins() != null ? stats.totalAdmins() : 0;
+        long employers = stats.totalEmployers() != null ? stats.totalEmployers() : 0;
+        long workers = stats.totalWorkers() != null ? stats.totalWorkers() : 0;
+        long activeJobs = stats.activeJobs() != null ? stats.activeJobs() : 0;
+        long completedShifts = stats.completedShifts();
         String lang = getLanguage(chatId);
 
-        AdminDtoTwo stats = adminService.getStats();
-
-        String statsText = String.format(
-                "📊 *Статистика платформы:*\n\n👥 Админов: `%d`\n🏢 Работодателей: `%d`\n👤 Исполнителей: `%d`",
-                stats.totalAdmins(),
-                stats.totalEmployers(), // ❌ Поле содержит 0 или null из-за неверного маппинга
-                stats.totalWorkers()    // ❌ Поле содержит 0 или null из-за неверного маппинга
-        );
-
-        SendMessage message = new SendMessage();
-        message.setChatId(String.valueOf(chatId));
-        message.setText("UZ".equals(lang)
-                ? "⚙️ **JobPlatform Admin Paneli**\nBo'limni tanlang:"
-                : "⚙️ **Панель администратора JobPlatform**\nВыберите действие:");
+        String menuText = "UZ".equals(lang) ?
+                String.format(
+                        "⚙️ *JobPlatform Administrator Paneli*\n\n" +
+                                "📊 *Batafsil platforma statistikasi:*\n" +
+                                " ├ 👥 Adminlar: `%d`\n" +
+                                " ├ 🏢 Ish beruvchilar: `%d`\n" +
+                                " ├ 👤 Ishchilar (Izlovchilar): `%d`\n" +
+                                " ├ 💼 Faol vakansiyalar: `%d`\n" +
+                                " └ ✅ Yakunlangan smenalar: `%d`\n\n" +
+                                "Harakatni tanlang:",
+                        admins, employers, workers, activeJobs, completedShifts
+                ) :
+                String.format(
+                        "⚙️ *Панель администратора JobPlatform*\n\n" +
+                                "📊 *Подробная статистика платформы:*\n" +
+                                " ├ 👥 Администраторов: `%d`\n" +
+                                " ├ 🏢 Работодателей: `%d`\n" +
+                                " ├ 👤 Исполнителей: `%d`\n" +
+                                " ├ 💼 Активных вакансий: `%d`\n" +
+                                " └ ✅ Завершенных смен: `%d`\n\n" +
+                                "Выберите действие:",
+                        admins, employers, workers, activeJobs, completedShifts
+                );
 
         InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
         List<List<InlineKeyboardButton>> rows = new ArrayList<>();
 
-        InlineKeyboardButton statsBtn = new InlineKeyboardButton();
-        statsBtn.setText("UZ".equals(lang) ? "📊 Platforma statistikasi" : "📊 Статистика платформы");
-        statsBtn.setCallbackData("admin_stats");
+        // Ряд 1: Списки пользователей
+        InlineKeyboardButton btnWorkers = new InlineKeyboardButton();
+        btnWorkers.setText("👷 " + ("UZ".equals(lang) ? "Ishchilar" : "Рабочие"));
+        btnWorkers.setCallbackData("admin_workers");
 
-        InlineKeyboardButton workersBtn = new InlineKeyboardButton();
-        workersBtn.setText("UZ".equals(lang) ? "👷 Ishchilar" : "👷 Рабочие");
-        workersBtn.setCallbackData("admin_workers");
+        InlineKeyboardButton btnEmployers = new InlineKeyboardButton();
+        btnEmployers.setText("🏢 " + ("UZ".equals(lang) ? "Ish beruvchilar" : "Работодатели"));
+        btnEmployers.setCallbackData("admin_employers");
 
-        InlineKeyboardButton employersBtn = new InlineKeyboardButton();
-        employersBtn.setText("UZ".equals(lang) ? "🏢 Ish beruvchilar" : "🏢 Работодатели");
-        employersBtn.setCallbackData("admin_employers");
+        rows.add(List.of(btnWorkers, btnEmployers));
 
-        InlineKeyboardButton langBtn = new InlineKeyboardButton();
-        langBtn.setText("🌐 Сменить язык / Tilni o'zgartirish");
-        langBtn.setCallbackData("change_language");
+        // Ряд 2: Обновление данных и Настройки
+        InlineKeyboardButton btnRefresh = new InlineKeyboardButton();
+        btnRefresh.setText("🔄 " + ("UZ".equals(lang) ? "Yangilash" : "Обновить"));
+        btnRefresh.setCallbackData("admin_refresh");
 
-        rows.add(List.of(statsBtn));
-        rows.add(List.of(workersBtn, employersBtn));
-        rows.add(List.of(langBtn));
+        InlineKeyboardButton btnLang = new InlineKeyboardButton();
+        btnLang.setText("🌐 " + ("UZ".equals(lang) ? "Tilni o'zgartirish" : "Сменить язык"));
+        btnLang.setCallbackData("change_language");
+
+        rows.add(List.of(btnRefresh, btnLang));
 
         markup.setKeyboard(rows);
-        message.setReplyMarkup(markup);
+
+        SendMessage message = new SendMessage();
+        message.setChatId(String.valueOf(chatId));
+        message.setText(menuText);
         message.setParseMode("Markdown");
+        message.setReplyMarkup(markup);
 
         try {
             execute(message);
-        } catch (TelegramApiException e) {
+        } catch (Exception e) {
             e.printStackTrace();
         }
     }
