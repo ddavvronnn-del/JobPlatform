@@ -13,15 +13,18 @@ import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.Keyboard
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.KeyboardRow;
 import uz.imaan.jobplatform.employer.job.JobStore;
 import uz.imaan.jobplatform.employer.job.JobVacancy;
+import uz.imaan.jobplatform.employer.job.JobVacancyRepository;
 import uz.imaan.jobplatform.jobseeker.dto.BankCardRequest;
 import uz.imaan.jobplatform.jobseeker.entity.BankCard;
 import uz.imaan.jobplatform.jobseeker.entity.JobApplication;
 import uz.imaan.jobplatform.jobseeker.entity.JobSeekerProfile;
 import uz.imaan.jobplatform.jobseeker.entity.Subscription;
+import uz.imaan.jobplatform.jobseeker.repository.BankCardRepository;
 import uz.imaan.jobplatform.jobseeker.repository.JobApplicationRepository;
 import uz.imaan.jobplatform.jobseeker.repository.JobSeekerProfileRepository;
 import uz.imaan.jobplatform.jobseeker.repository.SubscriptionRepository;
 import uz.imaan.jobplatform.jobseeker.service.interfaces.WalletService;
+import uz.imaan.jobplatform.telegram.EmployerHandler;
 import uz.imaan.jobplatform.telegram.JobSeekerHandler.interfaces.JobSeekerHandler;
 import uz.imaan.jobplatform.telegram.Telegram;
 
@@ -35,6 +38,8 @@ import java.util.concurrent.ConcurrentHashMap;
 @Component
 @RequiredArgsConstructor
 public class JobSeekerHandlerImpl implements JobSeekerHandler {
+
+
 
     private final SubscriptionRepository subscriptionRepository;
     private final Map<Long, JobSeekerState> previousStates = new ConcurrentHashMap<>();
@@ -61,7 +66,8 @@ public class JobSeekerHandlerImpl implements JobSeekerHandler {
         APPLY_COMMENT,
         WAITING_FOR_EDIT_NAME,
         WAITING_FOR_CARD_NUMBER,
-        WAITING_FOR_CARD_HOLDER
+        WAITING_FOR_CARD_HOLDER,
+        WAITING_FOR_PORTFOLIO
     }
 
     private final JobSeekerProfileRepository jobSeekerProfileRepository;
@@ -69,6 +75,9 @@ public class JobSeekerHandlerImpl implements JobSeekerHandler {
     private final JobStore jobStore;
     private final WalletService walletService;
     private final ApplicationContext applicationContext;
+    private final BankCardRepository bankCardRepository;
+    private final EmployerHandler employerHandler;
+    private final JobVacancyRepository jobVacancyRepository; // Sizda VacancyRepository bo'lishi ham mumkin
 
     private final Map<Long, JobSeekerState> states = new ConcurrentHashMap<>();
     private final Map<Long, Map<String, String>> data = new ConcurrentHashMap<>();
@@ -364,6 +373,7 @@ public class JobSeekerHandlerImpl implements JobSeekerHandler {
             return createMessage(chatId, getMainMenuText(profileOpt), getMainMenuKeyboard(profileOpt));
         }
 
+
         // KARTA QO'SHISH
         if (state == JobSeekerState.WAITING_FOR_CARD_NUMBER) {
             return handleCardNumber(chatId, text, profileOpt);
@@ -375,6 +385,11 @@ public class JobSeekerHandlerImpl implements JobSeekerHandler {
         // TIL TANLASH
         if (state == JobSeekerState.WAITING_FOR_LANGUAGE) {
             return handleLanguageSelection(chatId, text, profileOpt);
+        }
+
+        // PORTFOLIO KIRITISH
+        if (state == JobSeekerState.WAITING_FOR_PORTFOLIO && message.hasText()) {
+            return handlePortfolioInput(chatId, text, profileOpt);
         }
 
         // KATEGORIYA TANLASH (KASB O'ZGARTIRISH UCHUN)
@@ -1255,12 +1270,8 @@ public class JobSeekerHandlerImpl implements JobSeekerHandler {
             return createMessage(chatId, getProfileInfo(profile, profileOpt), getProfileKeyboard(profileOpt));
         }
         if (text.contains("Portfolio") || text.contains("Портфолио") || text.contains("Portfolio")) {
-            String msg = getText(profileOpt, chatId,
-                    "📁 **Раздел портфолио:**\n\nПортфолио пока не загружено.",
-                    "📁 **Portfolio bo'limi:**\n\nHozircha portfolio yuklanmagan.",
-                    "📁 **Portfolio section:**\n\nPortfolio not uploaded yet."
-            );
-            return createMessage(chatId, msg, getSubBackKeyboard(profileOpt));
+            return showPortfolio(chatId, profileOpt);
+
         }
         if (text.contains("Reyting") || text.contains("Рейтинг") || text.contains("Rating")) {
             String msg = getText(profileOpt, chatId,
@@ -1328,7 +1339,7 @@ public class JobSeekerHandlerImpl implements JobSeekerHandler {
         }
 
         // 2. Karta ma’lumoti (avvalgidek)
-        String cardDisplay = "❌ Karta mavjud emas";
+        String findFirstByJobSeekerId = "❌ Karta mavjud emas";
         try {
             if (profile.getBankCards() != null && !profile.getBankCards().isEmpty()) {
                 BankCard activeCard = profile.getBankCards().stream()
@@ -1336,14 +1347,14 @@ public class JobSeekerHandlerImpl implements JobSeekerHandler {
                         .findFirst().orElse(profile.getBankCards().get(0));
                 String cardNumber = activeCard.getCardNumber();
                 if (cardNumber != null && !cardNumber.isEmpty()) {
-                    cardDisplay = cardNumber;
+                    findFirstByJobSeekerId = cardNumber;
                 }
                 if (profile.getBankCards().size() > 1) {
-                    cardDisplay += " (+" + (profile.getBankCards().size() - 1) + " ta karta)";
+                    findFirstByJobSeekerId += " (+" + (profile.getBankCards().size() - 1) + " ta karta)";
                 }
             }
         } catch (Exception e) {
-            cardDisplay = "❌ Karta ma'lumoti olinmadi";
+            findFirstByJobSeekerId = "❌ Karta ma'lumoti olinmadi";
         }
 
         // 3. Tilga mos formatlash (keyingi qism o‘zgarishsiz)
@@ -1365,7 +1376,7 @@ public class JobSeekerHandlerImpl implements JobSeekerHandler {
                     profile.getProfession() != null ? profile.getProfession() : "Не указана",
                     profile.getExperience() != null ? profile.getExperience() : "Не указан",
                     jobTypeDisplay,
-                    cardDisplay
+                    findFirstByJobSeekerId
             );
         }
         if (isEnglish(profileOpt)) {
@@ -1386,7 +1397,7 @@ public class JobSeekerHandlerImpl implements JobSeekerHandler {
                     profile.getProfession() != null ? profile.getProfession() : "Not specified",
                     profile.getExperience() != null ? profile.getExperience() : "Not specified",
                     jobTypeDisplay,
-                    cardDisplay
+                    findFirstByJobSeekerId
             );
         }
         return String.format(
@@ -1406,11 +1417,9 @@ public class JobSeekerHandlerImpl implements JobSeekerHandler {
                 profile.getProfession() != null ? profile.getProfession() : "Ko'rsatilmagan",
                 profile.getExperience() != null ? profile.getExperience() : "Ko'rsatilmagan",
                 jobTypeDisplay,
-                cardDisplay
+                findFirstByJobSeekerId
         );
     }
-
-
 
 
     @Override
@@ -1836,14 +1845,30 @@ public class JobSeekerHandlerImpl implements JobSeekerHandler {
     // ============================================
     // KARTA QO'SHISH METODLARI
     // ============================================
+
     @Override
     public SendMessage handleCardNumber(Long chatId, String text, Optional<JobSeekerProfile> profileOpt) {
-        if (!text.matches("\\d{16}")) {
-            return createMessage(chatId, "❌ Karta raqami 16 ta raqamdan iborat bo'lishi kerak!\nQaytadan kiriting:", getCancelKeyboard(profileOpt));
+        // Probellarni olib tashlaymiz (masalan, foydalanuvchi "8600 1234..." deb yozsa ham ishlaydi)
+        String cardNumber = text.replaceAll("\\s+", "");
+
+        // 1. Faqat 16 ta raqam ekanligini va Luhn algoritmi bo'yicha to'g'riligini tekshiramiz
+        if (!isValidLuhn(cardNumber)) {
+            String errorMsg = getText(profileOpt, chatId,
+                    "❌ Karta raqami xato kiritildi! Iltimos, 16 xonali haqiqiy karta raqamini qaytadan kiriting:",
+                    "❌ Неверный номер карты! Пожалуйста, введите правильный 16-значный номер карты:",
+                    "❌ Invalid card number! Please re-enter a valid 16-digit card number:");
+            return createMessage(chatId, errorMsg, getCancelKeyboard(profileOpt));
         }
-        data.get(chatId).put("cardNumber", text);
+
+        // 2. Karta to'g'ri bo'lsa, xotiraga yozib, keyingi bosqichga o'tkazamiz
+        data.get(chatId).put("cardNumber", cardNumber);
         states.put(chatId, JobSeekerState.WAITING_FOR_CARD_HOLDER);
-        return createMessage(chatId, "👤 Karta egasi ismini kiriting:\nMasalan: ALI VALIYEV", getCancelKeyboard(profileOpt));
+
+        String successMsg = getText(profileOpt, chatId,
+                "👤 Karta egasi ismini kiriting:\nMasalan: ALI VALIYEV",
+                "👤 Введите имя владельца карты:\nНапример: ALI VALIYEV",
+                "👤 Enter the cardholder's name:\nE.g.: ALI VALIYEV");
+        return createMessage(chatId, successMsg, getCancelKeyboard(profileOpt));
     }
 
     @Override
@@ -1905,6 +1930,7 @@ public class JobSeekerHandlerImpl implements JobSeekerHandler {
         return "🛠 **Ishchi menyusi**\n\nKerakli bo'limni tanlang:";
     }
 
+
     // ============================================
     // YORDAMCHI METOD
     // ============================================
@@ -1916,4 +1942,198 @@ public class JobSeekerHandlerImpl implements JobSeekerHandler {
         if (keyboard != null) message.setReplyMarkup(keyboard);
         return message;
     }
+
+    // ============================================
+    // PORTFOLIO METODLARI
+    // ============================================
+    @Override
+    public SendMessage showPortfolio(Long chatId, Optional<JobSeekerProfile> profileOpt) {
+        states.put(chatId, JobSeekerState.WAITING_FOR_PORTFOLIO);
+
+        String currentPortfolio = profileOpt.map(JobSeekerProfile::getPortfolio).orElse(null);
+        StringBuilder msg = new StringBuilder();
+
+        if (currentPortfolio != null && !currentPortfolio.isEmpty()) {
+            msg.append(getText(profileOpt, chatId,
+                            "📁 **Ваше текущее портфолио:**\n\n",
+                            "📁 **Sizning joriy portfoliongiz:**\n\n",
+                            "📁 **Your current portfolio:**\n\n"))
+                    .append(currentPortfolio)
+                    .append("\n\n")
+                    .append(getText(profileOpt, chatId,
+                            "✏️ Yangilash uchun yangi havola yoki matn yuboring:",
+                            "✏️ Yangilash uchun yangi havola yoki matn yuboring:",
+                            "✏️ Send new portfolio link or text to update:"));
+        } else {
+            msg.append(getText(profileOpt, chatId,
+                    "📁 Отправьте ссылку на ваше портфолио (GitHub, резюме и т.д.):",
+                    "📁 Portfoliongizni kiriting (GitHub havola, loyihalar haqida matn yoki rezyume linki):",
+                    "📁 Please send your portfolio link (GitHub, resume, etc.):"));
+        }
+
+        return createMessage(chatId, msg.toString(), getCancelKeyboard(profileOpt));
+    }
+
+    @Override
+    public SendMessage handlePortfolioInput(Long chatId, String text, Optional<JobSeekerProfile> profileOpt) {
+        JobSeekerProfile profile = profileOpt.orElseGet(() -> {
+            JobSeekerProfile p = new JobSeekerProfile();
+            p.setUserId(chatId);
+            return p;
+        });
+
+        profile.setPortfolio(text);
+        jobSeekerProfileRepository.save(profile);
+
+        states.put(chatId, JobSeekerState.PROFILE_MENU);
+
+        String msg = getText(profileOpt, chatId,
+                "✅ Портфолио успешно сохранено!",
+                "✅ Portfolio muvaffaqiyatli saqlandi!",
+                "✅ Portfolio successfully saved!"
+        );
+
+        return createMessage(chatId, msg, getProfileKeyboard(profileOpt));
+    }
+
+    @Override
+    public String getProfileInfo(Long chatId, Optional<JobSeekerProfile> profileOpt) {
+        if (profileOpt.isEmpty()) {
+            return "Profil topilmadi / Профиль не найден";
+        }
+        JobSeekerProfile profile = profileOpt.get();
+
+        String jobTypeDisplay;
+        String preferred = profile.getPreferredJobType();
+        if ("PROFESSIONAL".equals(preferred) && profile.getProfession() != null && !profile.getProfession().isEmpty()) {
+            jobTypeDisplay = "👨‍💻 " + profile.getProfession();
+        } else {
+            if (isRussian(profileOpt)) jobTypeDisplay = "🔧 Обычный рабочий";
+            else if (isEnglish(profileOpt)) jobTypeDisplay = "🔧 Ordinary worker";
+            else jobTypeDisplay = "🔧 Oddiy ishchi";
+        }
+
+        String cardDisplay = bankCardRepository.findFirstByJobSeekerId(chatId)
+                .map(card -> maskCardNumber(card.getCardNumber()))
+                .orElse(getText(profileOpt, chatId, "Не указана", "Не указана Kiritilmagan", "Not set"));
+
+        return String.format(
+                "%s\n\n" +
+                        "👤 **%s:** %s\n" +
+                        "📞 **%s:** %s\n" +
+                        "🪪 **%s:** %s\n" +
+                        "💼 **%s:** %s\n" +
+                        "🔧 **%s:** %s\n" +
+                        "💳 **%s:** %s\n" +
+                        "⭐ **%s:** %.1f",
+
+                getText(profileOpt, chatId, "👤 **Sizning profilingiz:**", "👤 **Ваш профиль:**", "👤 **Your profile:**"),
+                getText(profileOpt, chatId, "F.I.O", "Ф.И.О", "Full Name"),
+                profile.getFullName(),
+                getText(profileOpt, chatId, "Tel", "Тел", "Phone"),
+                profile.getPhoneNumber(),
+                getText(profileOpt, chatId, "Pasport", "Паспорт", "Passport"),
+                profile.getPassportNumber(),
+                getText(profileOpt, chatId, "Kasb", "Профессия", "Profession"),
+                profile.getProfession() != null ? profile.getProfession() : "-",
+                getText(profileOpt, chatId, "Ish turi", "Тип работы", "Job Type"),
+                jobTypeDisplay,
+                getText(profileOpt, chatId, "Karta", "Карта", "Card"),
+                cardDisplay,
+                getText(profileOpt, chatId, "Reyting", "Рейтинг", "Rating"),
+                profile.getRating()
+        );
+    }
+
+    // 1. Karta raqamini niqoblash (Masking) metodi
+    private String maskCardNumber(String cardNumber) {
+        if (cardNumber == null || cardNumber.isBlank()) {
+            return "Mavjud emas";
+        }
+        // Karta raqamidagi barcha bo'shliqlarni olib tashlaymiz
+        String cleanCard = cardNumber.replaceAll("\\s+", "");
+
+        if (cleanCard.length() < 4) {
+            return "Mavjud emas";
+        }
+
+        // Faqat oxirgi 4 ta raqamni kesib olamiz
+        String lastFour = cleanCard.substring(cleanCard.length() - 4);
+        return "**** **** **** " + lastFour;
+    }
+
+    // 2. Yil/oy ma'lumotini so'ramaydigan Luhn validatsiyasi metodi
+    private boolean isValidLuhn(String cardNumber) {
+        if (cardNumber == null || cardNumber.isBlank()) {
+            return false;
+        }
+        // Bo'shliqlarni olib tashlaymiz
+        String clean = cardNumber.replaceAll("\\s+", "");
+
+        // O'zbekiston kartalari (Uzcard, Humo) odatda 16 xonali bo'ladi
+        if (clean.length() != 16) {
+            return false;
+        }
+
+        int sum = 0;
+        boolean alternate = false;
+
+        // Luhn formulasining matematik hisob-kitobi (o'ngdan chapga)
+        for (int i = clean.length() - 1; i >= 0; i--) {
+            int n = Integer.parseInt(clean.substring(i, i + 1));
+            if (alternate) {
+                n *= 2;
+                if (n > 9) {
+                    n = (n % 10) + 1;
+                }
+            }
+            sum += n;
+            alternate = !alternate;
+        }
+        // Agar umumiy yig'indi 10 ga qoldıqsiz bo'linsa - karta haqiqiy!
+        return (sum % 10 == 0);
+    }
+
+    public SendMessage handleCallback(org.telegram.telegrambots.meta.api.objects.CallbackQuery callbackQuery) {
+        if (callbackQuery == null || callbackQuery.getMessage() == null) return null;
+
+        String callbackData = callbackQuery.getData();
+        Long chatId = callbackQuery.getMessage().getChatId();
+
+        if (callbackData != null && callbackData.startsWith("apply_")) {
+            Long vacancyId = Long.parseLong(callbackData.substring("apply_".length()));
+
+            Optional<JobVacancy> vacancyOpt = jobVacancyRepository.findById(vacancyId);
+            Optional<JobSeekerProfile> seekerOpt = jobSeekerProfileRepository.findByUserId(chatId);
+
+            if (vacancyOpt.isPresent() && seekerOpt.isPresent()) {
+                JobVacancy vacancy = vacancyOpt.get();
+                JobSeekerProfile seeker = seekerOpt.get();
+
+                Long employerChatId = vacancy.getEmployerChatId();
+                Long applicationId = vacancy.getId();
+
+                // Ish beruvchiga xabar tayyorlash
+                SendMessage notificationToEmployer = employerHandler.buildApplicationNotification(
+                        employerChatId,
+                        applicationId,
+                        chatId,
+                        vacancy.getTitle(),
+                        seeker.getFullName(),
+                        seeker.getPhoneNumber(),
+                        "uz"
+                );
+
+                // Ish beruvchiga bildirishnomani yuborish
+                executeMessage(notificationToEmployer);
+
+                // Nomzodga javob xabarini qaytarish
+                return createMessage(chatId, "✅ Arizangiz muvaffaqiyatli topshirildi! Ish beruvchi javobini kuting.", getMainMenuKeyboard(seekerOpt));
+            } else {
+                return createMessage(chatId, "❌ Vakansiya yoki profilingiz topilmadi!", getMainMenuKeyboard(seekerOpt));
+            }
+        }
+        return null;
+    }
+
 }
