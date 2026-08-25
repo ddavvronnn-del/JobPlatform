@@ -24,17 +24,12 @@ import java.util.concurrent.ConcurrentHashMap;
 @Service
 public class TelegramBotService extends TelegramLongPollingBot {
 
-    // Хранение языка для каждого пользователя (chatId -> "RU" или "UZ")
     private final Map<Long, String> userLanguages = new ConcurrentHashMap<>();
-
-    private String getLanguage(long chatId) {
-        return userLanguages.getOrDefault(chatId, "RU"); // По умолчанию Русский
-    }
-
     private final Map<Long, String> userStates = new ConcurrentHashMap<>();
     private final Map<Long, AdminDtoTwo> pendingAdmins = new ConcurrentHashMap<>();
 
-    private String botUsername = "jobplatform_admin_bot";
+    private String botUsername = "employment_chirchik_bot";
+    private long lastUpdateId = 0;
 
     @Lazy
     @Autowired
@@ -46,6 +41,10 @@ public class TelegramBotService extends TelegramLongPollingBot {
         this.adminService = adminService;
     }
 
+    private String getLanguage(long chatId) {
+        return userLanguages.getOrDefault(chatId, "RU");
+    }
+
     @Override
     public String getBotUsername() {
         return botUsername;
@@ -54,11 +53,9 @@ public class TelegramBotService extends TelegramLongPollingBot {
     @Override
     public void onUpdateReceived(Update update) {
         try {
-            // Обработка текстовых сообщений
             if (update.hasMessage() && update.getMessage().hasText()) {
                 Message message = update.getMessage();
 
-                // ИГНОРИРУЕМ ПОВТОРНЫЕ ОБНОВЛЕНИЯ
                 if (lastUpdateId >= update.getUpdateId()) {
                     return;
                 }
@@ -68,7 +65,6 @@ public class TelegramBotService extends TelegramLongPollingBot {
                 return;
             }
 
-            // Обработка нажатий на кнопки
             if (update.hasCallbackQuery()) {
                 handleCallbackQuery(update.getCallbackQuery());
             }
@@ -77,23 +73,18 @@ public class TelegramBotService extends TelegramLongPollingBot {
         }
     }
 
-    private long lastUpdateId = 0;
-
     private void handleTextMessage(Message message) {
         String text = message.getText();
         long chatId = message.getChatId();
+
+        if (text == null) return;
 
         if (text.startsWith("/addadmin")) {
             handleAddAdminCommand(text, chatId);
             return;
         }
 
-        if (text == null) return;
-
-        // ===== ОБРАБОТКА КОМАНД =====
         if (text.startsWith("/")) {
-
-            // 1. КОМАНДА /START
             if ("/start".equals(text)) {
                 if (!userLanguages.containsKey(chatId)) {
                     userLanguages.put(chatId, "RU");
@@ -102,10 +93,8 @@ public class TelegramBotService extends TelegramLongPollingBot {
                 return;
             }
 
-            // 2. КОМАНДА /ADMIN
-            // 2. КОМАНДА /ADMIN
             if ("/admin".equals(text)) {
-                if (!adminService.isAdmin(chatId)) { // ✅ Исправлено: проверяет базу и список adminIds
+                if (!adminService.isAdmin(chatId)) {
                     sendMessage(chatId, "У вас нет прав администратора.");
                     return;
                 }
@@ -113,14 +102,16 @@ public class TelegramBotService extends TelegramLongPollingBot {
                 return;
             }
 
-            // 3. КОМАНДЫ БЛОКИРОВКИ И РАЗБЛОКИРОВКИ
             if (text.startsWith("/block") || text.startsWith("/unblock")) {
                 handleAdminCommand(text, chatId);
                 return;
             }
-        }
 
-        System.out.println("Игнорируем текст: " + text);
+            if (text.startsWith("/info ")) {
+                handleInfoCommand(chatId, text);
+                return;
+            }
+        }
     }
 
     private void handleCallbackQuery(CallbackQuery callbackQuery) {
@@ -161,10 +152,13 @@ public class TelegramBotService extends TelegramLongPollingBot {
         } else if ("admin_employers".equals(data) || "employers".equals(data)) {
             sendMessage(chatId, adminService.getFormattedEmployersList());
         } else if ("admin_refresh".equals(data)) {
-        sendAdminMenu(chatId);
-    }
-
-
+            sendAdminMenu(chatId);
+        } else if ("admin_find_by_tg_id".equals(data)) {
+            String text = "UZ".equals(getLanguage(chatId))
+                    ? "🔍 Foydalanuvchi haqida to'liq ma'lumot olish uchun buyruqni yuboring:\n\n`/info 123456789`"
+                    : "🔍 Чтобы получить полную информацию о пользователе, отправьте команду:\n\n`/info 123456789`";
+            sendMessage(chatId, text);
+        }
     }
 
     public void handleAdminCommand(String text, Long adminChatId) {
@@ -279,7 +273,14 @@ public class TelegramBotService extends TelegramLongPollingBot {
 
         rows.add(List.of(btnWorkers, btnEmployers));
 
-        // Ряд 2: Обновление данных и Настройки
+        // Ряд 2: Кнопка поиска по TG ID
+        InlineKeyboardButton btnFindTgId = new InlineKeyboardButton();
+        btnFindTgId.setText("🔍 " + ("UZ".equals(lang) ? "TG ID bo'yicha qidiruv" : "Инфо по TG ID"));
+        btnFindTgId.setCallbackData("admin_find_by_tg_id");
+
+        rows.add(List.of(btnFindTgId));
+
+        // Ряд 3: Обновление данных и Настройки
         InlineKeyboardButton btnRefresh = new InlineKeyboardButton();
         btnRefresh.setText("🔄 " + ("UZ".equals(lang) ? "Yangilash" : "Обновить"));
         btnRefresh.setCallbackData("admin_refresh");
@@ -305,6 +306,20 @@ public class TelegramBotService extends TelegramLongPollingBot {
         }
     }
 
+    private void handleInfoCommand(long chatId, String text) {
+        try {
+            Long targetTgId = Long.parseLong(text.replace("/info ", "").trim());
+            // Вызываем логику поиска через сервис
+            String result = String.valueOf(adminService.getAdminById(targetTgId));
+            sendMessage(chatId, result);
+        } catch (NumberFormatException e) {
+            sendMessage(chatId, "⚠️ Неверный формат ID. Используйте: `/info 123456789`");
+        } catch (Exception e) {
+            sendMessage(chatId, "⚠️ Ошибка при получении информации о пользователе.");
+            e.printStackTrace();
+        }
+    }
+
     public void sendMessage(long chatId, String text) {
         SendMessage message = SendMessage.builder()
                 .chatId(chatId)
@@ -312,23 +327,6 @@ public class TelegramBotService extends TelegramLongPollingBot {
                 .parseMode("Markdown")
                 .build();
         executeMessage(message);
-    }
-
-    private void editMessageText(long chatId, int messageId, String text, InlineKeyboardMarkup keyboard) {
-        EditMessageText message = EditMessageText.builder()
-                .chatId(chatId)
-                .messageId(messageId)
-                .text(text)
-                .parseMode("Markdown")
-                .replyMarkup(keyboard)
-                .build();
-        try {
-            execute(message);
-        } catch (TelegramApiException e) {
-            if (!e.getMessage().contains("message is not modified")) {
-                e.printStackTrace();
-            }
-        }
     }
 
     private void executeMessage(SendMessage message) {
@@ -424,7 +422,4 @@ public class TelegramBotService extends TelegramLongPollingBot {
             sendMessage(chatId, "❌ Ошибка при добавлении администратора: " + e.getMessage());
         }
     }
-
-
-
 }

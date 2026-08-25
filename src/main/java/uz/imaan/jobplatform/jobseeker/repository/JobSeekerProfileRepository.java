@@ -36,6 +36,7 @@ public interface JobSeekerProfileRepository extends JpaRepository<JobSeekerProfi
     List<JobSeekerProfile> searchForAdmin(@Param("keyword") String keyword);
 
 
+        @Query("SELECT j FROM JobSeekerProfile j WHERE j.userId = :tgId OR j.id = :tgId")
+        Optional<JobSeekerProfile> findByTgId(@Param("tgId") Long tgId);
+    }
 
-
-}
