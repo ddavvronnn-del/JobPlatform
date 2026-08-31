@@ -1313,17 +1313,16 @@ public class JobSeekerHandlerImpl implements JobSeekerHandler {
         return createMessage(chatId, msg, getProfileKeyboard(profileOpt));
     }
 
+
     @Override
     public String getProfileInfo(JobSeekerProfile profile, Optional<JobSeekerProfile> profileOpt) {
         // 1. Ish turini (jobTypeDisplay) tilga mos aniqlash
         String jobTypeDisplay;
         String preferred = profile.getPreferredJobType();
 
-        // Agar "PROFESSIONAL" bo‘lsa va kasb mavjud bo‘lsa – kasbni ko‘rsatish
         if ("PROFESSIONAL".equals(preferred) && profile.getProfession() != null && !profile.getProfession().isEmpty()) {
             jobTypeDisplay = "👨‍💻 " + profile.getProfession();
         } else {
-            // Oddiy ishchi – tilga mos matn
             if (isRussian(profileOpt)) {
                 jobTypeDisplay = "🔧 Обычный рабочий";
             } else if (isEnglish(profileOpt)) {
@@ -1331,14 +1330,13 @@ public class JobSeekerHandlerImpl implements JobSeekerHandler {
             } else {
                 jobTypeDisplay = "🔧 Oddiy ishchi";
             }
-            // Qo‘shimcha: agar preferred eski "Kasbim bo‘yicha" qiymatga ega bo‘lsa, profession ni ko‘rsatish
             if (profile.getProfession() != null && !profile.getProfession().isEmpty() &&
                     ("Kasbim bo'yicha".equals(preferred) || "По профессии".equals(preferred) || "By profession".equals(preferred))) {
                 jobTypeDisplay = "👨‍💻 " + profile.getProfession();
             }
         }
 
-        // 2. Karta ma’lumoti (avvalgidek)
+        // 2. Karta ma’lumoti – NIQOBLASH QO‘SHILDI
         String findFirstByJobSeekerId = "❌ Karta mavjud emas";
         try {
             if (profile.getBankCards() != null && !profile.getBankCards().isEmpty()) {
@@ -1347,7 +1345,7 @@ public class JobSeekerHandlerImpl implements JobSeekerHandler {
                         .findFirst().orElse(profile.getBankCards().get(0));
                 String cardNumber = activeCard.getCardNumber();
                 if (cardNumber != null && !cardNumber.isEmpty()) {
-                    findFirstByJobSeekerId = cardNumber;
+                    findFirstByJobSeekerId = maskCardNumber(cardNumber); // ⬅️ niqoblash
                 }
                 if (profile.getBankCards().size() > 1) {
                     findFirstByJobSeekerId += " (+" + (profile.getBankCards().size() - 1) + " ta karta)";
@@ -1357,7 +1355,7 @@ public class JobSeekerHandlerImpl implements JobSeekerHandler {
             findFirstByJobSeekerId = "❌ Karta ma'lumoti olinmadi";
         }
 
-        // 3. Tilga mos formatlash (keyingi qism o‘zgarishsiz)
+        // 3. Tilga mos formatlash
         if (isRussian(profileOpt)) {
             return String.format(
                     "👤 **Информация профиля:**\n\n" +
@@ -1515,6 +1513,7 @@ public class JobSeekerHandlerImpl implements JobSeekerHandler {
         return null;
     }
 
+
     @Override
     public SendMessage handleDeleteCard(Long chatId, Optional<JobSeekerProfile> profileOpt) {
         try {
@@ -1539,14 +1538,17 @@ public class JobSeekerHandlerImpl implements JobSeekerHandler {
             }
 
             BankCard cardToDelete = bankCards.get(0);
+            // 🔒 O‘chirilayotgan kartani niqoblash
+            String maskedCard = maskCardNumber(cardToDelete.getCardNumber());
+
             bankCards.remove(cardToDelete);
             profile.setBankCards(bankCards);
             jobSeekerProfileRepository.save(profile);
 
             String msg = getText(profileOpt, chatId,
-                    "✅ Карта успешно удалена!",
-                    "✅ Karta muvaffaqiyatli o'chirildi!",
-                    "✅ Card successfully deleted!"
+                    "✅ Карта успешно удалена! (" + maskedCard + ")",
+                    "✅ Karta muvaffaqiyatli o'chirildi! (" + maskedCard + ")",
+                    "✅ Card successfully deleted! (" + maskedCard + ")"
             );
             return createMessage(chatId, msg, getWalletKeyboard(profileOpt, false));
         } catch (Exception e) {
@@ -1559,6 +1561,7 @@ public class JobSeekerHandlerImpl implements JobSeekerHandler {
             return createMessage(chatId, msg, getMainMenuKeyboard(profileOpt));
         }
     }
+
 
     @Override
     public SendMessage showWallet(Long chatId, Optional<JobSeekerProfile> profileOpt) {
@@ -1584,7 +1587,10 @@ public class JobSeekerHandlerImpl implements JobSeekerHandler {
                         .filter(card -> card.getIsActive() != null && card.getIsActive())
                         .findFirst().orElse(bankCards.get(0));
                 String cardNumber = activeCard.getCardNumber();
-                if (cardNumber != null && !cardNumber.isEmpty()) cardNumberDisplay = cardNumber;
+                if (cardNumber != null && !cardNumber.isEmpty()) {
+                    // ⬇️ NIQOBLASH QO‘SHILDI
+                    cardNumberDisplay = maskCardNumber(cardNumber);
+                }
                 String cardHolderName = activeCard.getCardHolderName();
                 if (cardHolderName != null && !cardHolderName.isEmpty()) {
                     cardHolderDisplay = "👤 **Karta egasi:** " + cardHolderName;
@@ -1871,6 +1877,7 @@ public class JobSeekerHandlerImpl implements JobSeekerHandler {
         return createMessage(chatId, successMsg, getCancelKeyboard(profileOpt));
     }
 
+
     @Override
     public SendMessage handleCardHolder(Long chatId, String text, Optional<JobSeekerProfile> profileOpt) {
         if (text.length() < 3) {
@@ -1884,29 +1891,26 @@ public class JobSeekerHandlerImpl implements JobSeekerHandler {
             );
             return createMessage(chatId, msg, getMainMenuKeyboard(profileOpt));
         }
-        // 3. Oldingi bosqichda saqlangan karta raqamini olish
+
         Map<String, String> userData = data.get(chatId);
         String cardNumber = userData.get("cardNumber");
-
         if (cardNumber == null || cardNumber.isEmpty()) {
             return createMessage(chatId, "Karta raqami topilmadi. Iltimos, /start dan qayta boshlang.", getMainMenuKeyboard(profileOpt));
         }
 
         try {
             BankCardRequest request = new BankCardRequest(cardNumber, text.toUpperCase());
-
-            // 5. Kartani tizimga qo'shish
             walletService.addBankCard(chatId, request);
 
-            // 6. Holatni o'zgartirish va vaqtinchalik ma'lumotlarni tozalash
             states.put(chatId, JobSeekerState.WALLET_MENU);
             userData.remove("cardNumber");
 
-            // 7. Foydalanuvchiga muvaffaqiyatli xabar yuborish
+            // 🔒 Karta raqamini niqoblash
+            String maskedCard = maskCardNumber(cardNumber);
             String msg = getText(profileOpt, chatId,
-                    "✅ Karta muvaffaqiyatli qo'shildi!\n\n💳 Karta: " + cardNumber + "\n👤 Egasi: " + text.toUpperCase(),
-                    "✅ Karta muvaffaqiyatli qo'shildi!\n\n💳 Karta: " + cardNumber + "\n👤 Egasi: " + text.toUpperCase(),
-                    "✅ Card successfully added!\n\n💳 Card: " + cardNumber + "\n👤 Holder: " + text.toUpperCase()
+                    "✅ Karta muvaffaqiyatli qo'shildi!\n\n💳 Karta: " + maskedCard + "\n👤 Egasi: " + text.toUpperCase(),
+                    "✅ Karta muvaffaqiyatli qo'shildi!\n\n💳 Karta: " + maskedCard + "\n👤 Egasi: " + text.toUpperCase(),
+                    "✅ Card successfully added!\n\n💳 Card: " + maskedCard + "\n👤 Holder: " + text.toUpperCase()
             );
             return createMessage(chatId, msg, getWalletKeyboard(profileOpt));
         } catch (Exception e) {
