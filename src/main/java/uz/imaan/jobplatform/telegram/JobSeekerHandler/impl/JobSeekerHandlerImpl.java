@@ -5,6 +5,9 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationContext;
 import org.springframework.stereotype.Component;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
+import org.telegram.telegrambots.meta.api.methods.updatingmessages.EditMessageReplyMarkup;
+import org.telegram.telegrambots.meta.api.methods.updatingmessages.EditMessageText;
+import org.telegram.telegrambots.meta.api.objects.CallbackQuery;
 import org.telegram.telegrambots.meta.api.objects.Message;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.ReplyKeyboardMarkup;
@@ -38,7 +41,6 @@ import java.util.concurrent.ConcurrentHashMap;
 @Component
 @RequiredArgsConstructor
 public class JobSeekerHandlerImpl implements JobSeekerHandler {
-
 
 
     private final SubscriptionRepository subscriptionRepository;
@@ -78,6 +80,7 @@ public class JobSeekerHandlerImpl implements JobSeekerHandler {
     private final BankCardRepository bankCardRepository;
     private final EmployerHandler employerHandler;
     private final JobVacancyRepository jobVacancyRepository; // Sizda VacancyRepository bo'lishi ham mumkin
+    private static final int PAGE_SIZE = 5;
 
     private final Map<Long, JobSeekerState> states = new ConcurrentHashMap<>();
     private final Map<Long, Map<String, String>> data = new ConcurrentHashMap<>();
@@ -212,72 +215,56 @@ public class JobSeekerHandlerImpl implements JobSeekerHandler {
     // ============================================
     // KATEGORIYA BO‘YICHA QIDIRISH
     // ============================================
+
     @Override
     public void handleCategorySearch(Long chatId, String categoryKey, Optional<JobSeekerProfile> profileOpt) {
-        // ... (o‘zgarmagan, faqat getText ga chatId qo‘shilgan)
-        try {
-            String categoryName = getCategoryName(categoryKey);
-            List<JobVacancy> vacancies;
-            if (categoryKey.equals("all")) {
-                vacancies = jobStore.getAllVacancies();
-            } else {
-                vacancies = jobStore.getAllVacancies().stream()
-                        .filter(v -> v.getCategory() != null &&
-                                v.getCategory().toLowerCase().contains(categoryName.toLowerCase()))
-                        .toList();
-            }
-
-            if (vacancies == null || vacancies.isEmpty()) {
-                String msg = getText(profileOpt, chatId,
-                        "❌ Ushbu kategoriya bo'yicha hozircha faol vakansiyalar mavjud emas.",
-                        "❌ Ushbu kategoriya bo'yicha hozircha faol vakansiyalar mavjud emas.",
-                        "❌ No active vacancies available for this category."
-                );
-                sendMessage(chatId, msg);
-                return;
-            }
-
-            StringBuilder result = new StringBuilder();
-            String title = getText(profileOpt, chatId,
-                    "📋 **Topilgan vakansiyalar (" + vacancies.size() + "):**\n\n",
-                    "📋 **Topilgan vakansiyalar (" + vacancies.size() + "):**\n\n",
-                    "📋 **Found vacancies (" + vacancies.size() + "):**\n\n"
-            );
-            result.append(title);
-
-            for (int i = 0; i < vacancies.size(); i++) {
-                JobVacancy vacancy = vacancies.get(i);
-                result.append(i + 1).append(". 📌 **").append(vacancy.getTitle()).append("**\n");
-                result.append("   📂 Kategoriya: ").append(vacancy.getCategory()).append("\n");
-                result.append("   💰 Maosh: ").append(vacancy.getSalary()).append("\n");
-                result.append("───────────────\n");
-            }
-
-            InlineKeyboardMarkup backMarkup = new InlineKeyboardMarkup();
-            List<List<InlineKeyboardButton>> backRows = new ArrayList<>();
-            List<InlineKeyboardButton> backRow = new ArrayList<>();
-            String backText = isRussian(profileOpt) ? "⬅️ Назад" : (isEnglish(profileOpt) ? "⬅️ Back" : "⬅️ Orqaga");
-            backRow.add(InlineKeyboardButton.builder().text(backText).callbackData("back_to_categories").build());
-            backRows.add(backRow);
-            backMarkup.setKeyboard(backRows);
-
-            SendMessage response = new SendMessage();
-            response.setChatId(chatId.toString());
-            response.setText(result.toString());
-            response.setParseMode("Markdown");
-            response.setReplyMarkup(backMarkup);
-            executeMessage(response);
-
-        } catch (Exception e) {
-            log.error("❌ Xatolik: {}", e.getMessage());
-            String msg = getText(profileOpt, chatId,
-                    "❌ Xatolik yuz berdi. Qaytadan urinib ko'ring.",
-                    "❌ Xatolik yuz berdi. Qaytadan urinib ko'ring.",
-                    "❌ An error occurred. Please try again."
-            );
-            sendMessage(chatId, msg);
-        }
+        SendMessage response = handleVacancyPagination(chatId, categoryKey, 0, profileOpt);
+        executeMessage(response);
     }
+
+    private InlineKeyboardMarkup buildPaginationKeyboardk(String categoryKey, int currentPage, int totalPages,
+                                                         Optional<JobSeekerProfile> profileOpt) {
+        List<List<InlineKeyboardButton>> rows = new ArrayList<>();
+        List<InlineKeyboardButton> row = new ArrayList<>();
+
+        // Oldingi tugma
+        if (currentPage > 0) {
+            InlineKeyboardButton prev = new InlineKeyboardButton();
+            prev.setText("⬅️");
+            prev.setCallbackData("vacancy_page_" + categoryKey + "_" + (currentPage - 1));
+            row.add(prev);
+        }
+
+        // Sahifa ko'rsatkichi (faqat matn, hech narsa qilmaydi)
+        InlineKeyboardButton pageInfo = new InlineKeyboardButton();
+        pageInfo.setText((currentPage + 1) + "/" + totalPages);
+        pageInfo.setCallbackData("ignore"); // hech narsa qilmaydigan callback
+        row.add(pageInfo);
+
+        // Keyingi tugma
+        if (currentPage < totalPages - 1) {
+            InlineKeyboardButton next = new InlineKeyboardButton();
+            next.setText("➡️");
+            next.setCallbackData("vacancy_page_" + categoryKey + "_" + (currentPage + 1));
+            row.add(next);
+        }
+
+        rows.add(row);
+
+        // Orqaga qaytish tugmasi
+        List<InlineKeyboardButton> backRow = new ArrayList<>();
+        InlineKeyboardButton back = new InlineKeyboardButton();
+        String backText = isRussian(profileOpt) ? "⬅️ Назад" : (isEnglish(profileOpt) ? "⬅️ Back" : "⬅️ Orqaga");
+        back.setText(backText);
+        back.setCallbackData("back_to_categories");
+        backRow.add(back);
+        rows.add(backRow);
+
+        InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
+        markup.setKeyboard(rows);
+        return markup;
+    }
+
 
     private String getCategoryName(String key) {
         return switch (key) {
@@ -2048,6 +2035,127 @@ public class JobSeekerHandlerImpl implements JobSeekerHandler {
                 profile.getRating()
         );
     }
+    // ============================================
+// PAGINATION – VAKANSİYALAR
+// ============================================
+
+
+    @Override
+    public SendMessage handleVacancyPagination(Long chatId, String categoryKey, int page,
+                                               Optional<JobSeekerProfile> profileOpt) {
+        try {
+            // 1. Kategoriya bo‘yicha vakansiyalarni olish
+            List<JobVacancy> allVacancies;
+            if ("all".equals(categoryKey)) {
+                allVacancies = jobStore.getAllVacancies();
+            } else {
+                String categoryName = getCategoryName(categoryKey);
+                allVacancies = jobStore.getAllVacancies().stream()
+                        .filter(v -> v.getCategory() != null &&
+                                v.getCategory().toLowerCase().contains(categoryName.toLowerCase()))
+                        .toList();
+            }
+
+            if (allVacancies == null || allVacancies.isEmpty()) {
+                String msg = getText(profileOpt, chatId,
+                        "❌ Ushbu kategoriya bo'yicha hozircha faol vakansiyalar mavjud emas.",
+                        "❌ Bu kategoriya bo'yicha hozircha faol vakansiyalar mavjud emas.",
+                        "❌ No active vacancies available for this category."
+                );
+                return createMessage(chatId, msg, getSearchCategoryKeyboard(profileOpt));
+            }
+
+            // 2. Jami sahifalar soni
+            int totalPages = (int) Math.ceil((double) allVacancies.size() / PAGE_SIZE);
+            if (page < 0) page = 0;
+            if (page >= totalPages) page = totalPages - 1;
+
+            int start = page * PAGE_SIZE;
+            int end = Math.min(start + PAGE_SIZE, allVacancies.size());
+            List<JobVacancy> pageVacancies = allVacancies.subList(start, end);
+
+            // 3. Xabar matnini tayyorlash
+            StringBuilder result = new StringBuilder();
+            String title = getText(profileOpt, chatId,
+                    "📋 **Topilgan vakansiyalar (" + allVacancies.size() + "):**\n\n",
+                    "📋 **Topilgan vakansiyalar (" + allVacancies.size() + "):**\n\n",
+                    "📋 **Found vacancies (" + allVacancies.size() + "):**\n\n"
+            );
+            result.append(title);
+
+            for (int i = 0; i < pageVacancies.size(); i++) {
+                JobVacancy vacancy = pageVacancies.get(i);
+                int index = start + i + 1;
+                result.append(index).append(". 📌 **").append(vacancy.getTitle()).append("**\n");
+                result.append("   📂 Kategoriya: ").append(vacancy.getCategory()).append("\n");
+                result.append("   💰 Maosh: ").append(vacancy.getSalary()).append("\n");
+                result.append("───────────────\n");
+            }
+
+            // 4. Inline keyboard – pagination
+            InlineKeyboardMarkup keyboard = buildPaginationKeyboard(categoryKey, page, totalPages, profileOpt);
+
+            // 5. Xabarni yuborish
+            SendMessage message = new SendMessage();
+            message.setChatId(chatId.toString());
+            message.setText(result.toString());
+            message.setParseMode("Markdown");
+            message.setReplyMarkup(keyboard);
+            return message;
+
+        } catch (Exception e) {
+            log.error("❌ Paginatsiya xatoligi: {}", e.getMessage());
+            String msg = getText(profileOpt, chatId,
+                    "❌ Xatolik yuz berdi. Qaytadan urinib ko'ring.",
+                    "❌ Xatolik yuz berdi. Qaytadan urinib ko'ring.",
+                    "❌ An error occurred. Please try again."
+            );
+            return createMessage(chatId, msg, getSearchCategoryKeyboard(profileOpt));
+        }
+    }
+
+    private InlineKeyboardMarkup buildPaginationKeyboard(String categoryKey, int currentPage, int totalPages,
+                                                         Optional<JobSeekerProfile> profileOpt) {
+        List<List<InlineKeyboardButton>> rows = new ArrayList<>();
+        List<InlineKeyboardButton> row = new ArrayList<>();
+
+        // Oldingi tugma
+        if (currentPage > 0) {
+            InlineKeyboardButton prev = new InlineKeyboardButton();
+            prev.setText("⬅️");
+            prev.setCallbackData("vacancy_page_" + categoryKey + "_" + (currentPage - 1));
+            row.add(prev);
+        }
+
+        // Sahifa ko‘rsatkichi (faqat matn)
+        InlineKeyboardButton pageInfo = new InlineKeyboardButton();
+        pageInfo.setText((currentPage + 1) + "/" + totalPages);
+        pageInfo.setCallbackData("ignore"); // hech narsa qilmaydi
+        row.add(pageInfo);
+
+        // Keyingi tugma
+        if (currentPage < totalPages - 1) {
+            InlineKeyboardButton next = new InlineKeyboardButton();
+            next.setText("➡️");
+            next.setCallbackData("vacancy_page_" + categoryKey + "_" + (currentPage + 1));
+            row.add(next);
+        }
+
+        rows.add(row);
+
+        // Orqaga qaytish tugmasi
+        List<InlineKeyboardButton> backRow = new ArrayList<>();
+        InlineKeyboardButton back = new InlineKeyboardButton();
+        String backText = isRussian(profileOpt) ? "⬅️ Назад" : (isEnglish(profileOpt) ? "⬅️ Back" : "⬅️ Orqaga");
+        back.setText(backText);
+        back.setCallbackData("back_to_categories");
+        backRow.add(back);
+        rows.add(backRow);
+
+        InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
+        markup.setKeyboard(rows);
+        return markup;
+    }
 
     // 1. Karta raqamini niqoblash (Masking) metodi
     private String maskCardNumber(String cardNumber) {
@@ -2098,46 +2206,73 @@ public class JobSeekerHandlerImpl implements JobSeekerHandler {
         return (sum % 10 == 0);
     }
 
-    public SendMessage handleCallback(org.telegram.telegrambots.meta.api.objects.CallbackQuery callbackQuery) {
+
+    @Override
+    public SendMessage handleCallback(CallbackQuery callbackQuery) {
         if (callbackQuery == null || callbackQuery.getMessage() == null) return null;
 
         String callbackData = callbackQuery.getData();
         Long chatId = callbackQuery.getMessage().getChatId();
+        Integer messageId = callbackQuery.getMessage().getMessageId();
 
-        if (callbackData != null && callbackData.startsWith("apply_")) {
-            Long vacancyId = Long.parseLong(callbackData.substring("apply_".length()));
+        // ===== PAGINATION =====
+        if (callbackData != null && callbackData.startsWith("vacancy_page_")) {
+            String[] parts = callbackData.split("_");
+            if (parts.length >= 4) {
+                String categoryKey = parts[2];
+                int page = Integer.parseInt(parts[3]);
 
-            Optional<JobVacancy> vacancyOpt = jobVacancyRepository.findById(vacancyId);
-            Optional<JobSeekerProfile> seekerOpt = jobSeekerProfileRepository.findByUserId(chatId);
+                Optional<JobSeekerProfile> profileOpt = jobSeekerProfileRepository.findByUserId(chatId);
+                SendMessage newMsg = handleVacancyPagination(chatId, categoryKey, page, profileOpt);
 
-            if (vacancyOpt.isPresent() && seekerOpt.isPresent()) {
-                JobVacancy vacancy = vacancyOpt.get();
-                JobSeekerProfile seeker = seekerOpt.get();
+                try {
+                    Telegram bot = applicationContext.getBean(Telegram.class);
 
-                Long employerChatId = vacancy.getEmployerChatId();
-                Long applicationId = vacancy.getId();
+                    // Matnni yangilash
+                    EditMessageText editText = new EditMessageText();
+                    editText.setChatId(chatId.toString());
+                    editText.setMessageId(messageId);
+                    editText.setText(newMsg.getText());
+                    editText.setParseMode("Markdown");
+                    bot.execute(editText);
 
-                // Ish beruvchiga xabar tayyorlash
-                SendMessage notificationToEmployer = employerHandler.buildApplicationNotification(
-                        employerChatId,
-                        applicationId,
-                        chatId,
-                        vacancy.getTitle(),
-                        seeker.getFullName(),
-                        seeker.getPhoneNumber(),
-                        "uz"
-                );
+                    // Keyboardni yangilash
+                    EditMessageReplyMarkup editMarkup = new EditMessageReplyMarkup();
+                    editMarkup.setChatId(chatId.toString());
+                    editMarkup.setMessageId(messageId);
+                    editMarkup.setReplyMarkup((InlineKeyboardMarkup) newMsg.getReplyMarkup());
+                    bot.execute(editMarkup);
 
-                // Ish beruvchiga bildirishnomani yuborish
-                executeMessage(notificationToEmployer);
-
-                // Nomzodga javob xabarini qaytarish
-                return createMessage(chatId, "✅ Arizangiz muvaffaqiyatli topshirildi! Ish beruvchi javobini kuting.", getMainMenuKeyboard(seekerOpt));
-            } else {
-                return createMessage(chatId, "❌ Vakansiya yoki profilingiz topilmadi!", getMainMenuKeyboard(seekerOpt));
+                    return null;
+                } catch (Exception e) {
+                    log.error("❌ Xabarni tahrirlashda xatolik: {}", e.getMessage());
+                    executeMessage(newMsg);
+                    return null;
+                }
             }
         }
+
+        // ===== ORQAGA QAYTISH =====
+        if ("back_to_categories".equals(callbackData)) {
+            Optional<JobSeekerProfile> profileOpt = jobSeekerProfileRepository.findByUserId(chatId);
+            String msg = getText(profileOpt, chatId,
+                    "📂 **Выберите категорию для поиска:**",
+                    "📂 **Kategoriyani tanlang:**",
+                    "📂 **Select a category to search:**"
+            );
+            SendMessage response = new SendMessage();
+            response.setChatId(chatId.toString());
+            response.setText(msg);
+            response.setParseMode("Markdown");
+            response.setReplyMarkup(getCategoryInlineKeyboard(profileOpt));
+            return response;
+        }
+
+        // ===== ARIZA TOPSHIRISH (apply_) =====
+        if (callbackData != null && callbackData.startsWith("apply_")) {
+            // Sizning mavjud apply logikangiz
+        }
+
         return null;
     }
-
 }

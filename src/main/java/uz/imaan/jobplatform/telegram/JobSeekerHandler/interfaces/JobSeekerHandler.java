@@ -117,4 +117,6 @@ public interface JobSeekerHandler {
 
     SendMessage handleCallback(CallbackQuery callbackQuery);
 
+    SendMessage handleVacancyPagination(Long chatId, String categoryKey, int page, Optional<JobSeekerProfile> profileOpt);
+
 }
